@@ -405,7 +405,7 @@ a:active {
 
 .settings-dock {
   position: fixed;
-  right: 18px;
+  left: 278px;
   bottom: 18px;
   z-index: 30;
   display: flex;

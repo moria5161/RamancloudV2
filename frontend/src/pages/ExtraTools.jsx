@@ -1,13 +1,14 @@
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
 import { Archive, ArrowRightLeft, Combine, Download, FileArchive, Scissors, Upload } from 'lucide-react';
+import { usePreferences } from '../i18n';
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const tools = [
-  { id: 'split', label: 'Split Mapping', icon: Scissors },
-  { id: 'merge', label: 'Merge Spectra', icon: Combine },
-  { id: 'convert', label: 'Format Conversion', icon: ArrowRightLeft },
+  { id: 'split', labelKey: 'splitMapping', descKey: 'splitMappingDesc', icon: Scissors },
+  { id: 'merge', labelKey: 'mergeSpectra', descKey: 'mergeSpectraDesc', icon: Combine },
+  { id: 'convert', labelKey: 'formatConversion', descKey: 'conversion', icon: ArrowRightLeft },
 ];
 
 function saveBlob(blob, filename) {
@@ -25,6 +26,7 @@ function errorMessage(error) {
 }
 
 export default function ExtraTools() {
+  const { t } = usePreferences();
   const [mode, setMode] = useState('split');
   const [instrument, setInstrument] = useState('Horiba');
   const [conversion, setConversion] = useState('horiba_to_nanophoton');
@@ -49,7 +51,7 @@ export default function ExtraTools() {
 
   const runTool = async () => {
     if (!selectedFiles.length) {
-      setMessage('Please upload the required file first.');
+      setMessage(t('uploadRequired'));
       return;
     }
     setIsRunning(true);
@@ -78,7 +80,7 @@ export default function ExtraTools() {
 
       const { data } = await axios.post(endpoint, formData, { responseType: 'blob' });
       saveBlob(data, filename);
-      setMessage('Done. The result file has been generated.');
+      setMessage(t('toolDone'));
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -92,15 +94,15 @@ export default function ExtraTools() {
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <FileArchive className="w-6 h-6 text-indigo-400" />
-            <h1 className="text-2xl font-bold text-white">Extra Tools</h1>
+            <h1 className="text-2xl font-bold text-white">{t('extraTools')}</h1>
           </div>
           <p className="text-sm text-gray-400 max-w-2xl">
-            Utility tools for mapping file splitting, spectral file merging, and mapping format conversion between instruments.
+            {t('extraToolsDesc')}
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          {tools.map(({ id, label, icon: Icon }) => (
+          {tools.map(({ id, labelKey, descKey, icon: Icon }) => (
             <button
               key={id}
               onClick={() => handleMode(id)}
@@ -113,11 +115,9 @@ export default function ExtraTools() {
                   <Icon className="w-5 h-5 text-indigo-400" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-gray-200">{label}</div>
+                  <div className="text-sm font-semibold text-gray-200">{t(labelKey)}</div>
                   <div className="text-xs text-gray-500">
-                    {id === 'split' && 'Mapping to individual spectra'}
-                    {id === 'merge' && 'Spectra to one mapping table'}
-                    {id === 'convert' && 'Horiba / Nanophoton'}
+                    {id === 'convert' ? 'Horiba / Nanophoton' : t(descKey)}
                   </div>
                 </div>
               </div>
@@ -129,14 +129,14 @@ export default function ExtraTools() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-gray-200">
-                {mode === 'split' && 'Split Mapping Into Spectra'}
-                {mode === 'merge' && 'Merge Files Into A Mapping'}
-                {mode === 'convert' && 'Mapping Format Conversion'}
+                {mode === 'split' && t('splitMappingTitle')}
+                {mode === 'merge' && t('mergeSpectraTitle')}
+                {mode === 'convert' && t('conversionTitle')}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                {mode === 'split' && 'Upload one mapping file and download a zip package of single-spectrum text files.'}
-                {mode === 'merge' && 'Upload multiple spectrum files and download one merged mapping text file.'}
-                {mode === 'convert' && 'Upload one mapping file and convert its instrument-specific table format.'}
+                {mode === 'split' && t('splitMappingHelp')}
+                {mode === 'merge' && t('mergeSpectraHelp')}
+                {mode === 'convert' && t('conversionHelp')}
               </p>
             </div>
             <Archive className="w-5 h-5 text-indigo-400" />
@@ -145,7 +145,7 @@ export default function ExtraTools() {
           <div className="flex flex-wrap items-center gap-4">
             {mode === 'split' && (
               <label className="space-y-1.5">
-                <span className="text-xs text-gray-500">Instrument</span>
+                <span className="text-xs text-gray-500">{t('instrument')}</span>
                 <select value={instrument} onChange={(e) => setInstrument(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
                   <option value="Horiba">Horiba</option>
                   <option value="Renishaw">Renishaw</option>
@@ -156,7 +156,7 @@ export default function ExtraTools() {
 
             {mode === 'convert' && (
               <label className="space-y-1.5">
-                <span className="text-xs text-gray-500">Conversion</span>
+                <span className="text-xs text-gray-500">{t('conversion')}</span>
                 <select value={conversion} onChange={(e) => setConversion(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
                   <option value="horiba_to_nanophoton">Horiba to Nanophoton</option>
                   <option value="nanophoton_to_horiba">Nanophoton to Horiba</option>
@@ -169,7 +169,7 @@ export default function ExtraTools() {
               className="liquid-button flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-gray-300 text-sm font-medium border border-white/5"
             >
               <Upload className="w-4 h-4" />
-              {multiple ? 'Upload Files' : 'Upload File'}
+              {multiple ? t('uploadFiles') : t('uploadFile')}
             </button>
 
             <input
@@ -194,7 +194,7 @@ export default function ExtraTools() {
               </div>
             ) : (
               <div className="h-16 flex items-center justify-center text-sm text-gray-500">
-                No file selected
+                {t('noFileSelected')}
               </div>
             )}
           </div>
@@ -211,7 +211,7 @@ export default function ExtraTools() {
               disabled={isRunning}
               className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isRunning ? 'Running...' : 'Run Tool'}
+              {isRunning ? t('running') : t('runTool')}
               <Download className="w-4 h-4" />
             </button>
           </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import StepController from './StepController';
 import { Play, Download, RotateCcw, Loader2, Zap } from 'lucide-react';
+import { usePreferences } from '../i18n';
 
 export default function ControlPanel({
   steps,
@@ -16,47 +17,49 @@ export default function ControlPanel({
   cutRange,
   onCutRangeChange,
 }) {
+  const { t } = usePreferences();
+
   return (
     <div className="h-full flex flex-col glass border-l border-white/5">
       {/* Header */}
       <div className="p-4 border-b border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">Controls</h2>
+          <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">{t('controls')}</h2>
         </div>
 
         {/* Data source */}
         <div className="space-y-2">
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Data Source</label>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('dataSource')}</label>
           <select
             value={demoName || ''}
             onChange={e => onDemoChange(e.target.value)}
             className="w-full px-2.5 py-1.5 text-xs bg-black/30 border border-white/10 rounded-lg text-gray-200 focus:border-indigo-500/50 focus:outline-none"
           >
-            <option value="">Upload file...</option>
+            <option value="">{t('uploadFileEllipsis')}</option>
             {demos.map(d => (
               <option key={d} value={d}>{d === 'bacteria' ? 'Bacteria' : d === 'ulf' ? 'ULF Raman' : 'Tutorial Raman'}</option>
             ))}
           </select>
           {fileName && (
-            <p className="text-[10px] text-gray-500 truncate">File: {fileName}</p>
+            <p className="text-[10px] text-gray-500 truncate">{t('file')}: {fileName}</p>
           )}
         </div>
 
         {/* Quick cut range */}
         <div className="mt-3 space-y-1.5">
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Quick Cut Range (cm⁻¹)</label>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('quickCutRange')}</label>
           <div className="flex gap-1.5">
             <input
               type="number"
-              placeholder="Min"
+              placeholder={t('min')}
               value={cutRange?.[0] || ''}
               onChange={e => onCutRangeChange?.([parseFloat(e.target.value) || 0, cutRange?.[1] || 4000])}
               className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
             />
             <input
               type="number"
-              placeholder="Max"
+              placeholder={t('max')}
               value={cutRange?.[1] || ''}
               onChange={e => onCutRangeChange?.([cutRange?.[0] || 0, parseFloat(e.target.value) || 4000])}
               className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
@@ -82,7 +85,7 @@ export default function ControlPanel({
           ) : (
             <Play className="w-4 h-4" />
           )}
-          {isProcessing ? 'Processing...' : 'Run Pipeline'}
+          {isProcessing ? t('processing') : t('runPipeline')}
         </button>
 
         <div className="flex gap-2">
@@ -91,14 +94,14 @@ export default function ControlPanel({
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-all"
           >
             <Download className="w-3 h-3" />
-            Download
+            {t('download')}
           </button>
           <button
             onClick={onReset}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 text-xs font-medium transition-all"
           >
             <RotateCcw className="w-3 h-3" />
-            Reset
+            {t('reset')}
           </button>
         </div>
       </div>
