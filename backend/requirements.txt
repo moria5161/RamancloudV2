@@ -1,0 +1,8 @@
+fastapi
+uvicorn==0.17.0
+python-multipart
+pydantic==1.9.2
+numpy
+pandas
+scipy
+PyWavelets
