@@ -8,21 +8,21 @@ export default function Contributors() {
   const team = [
     {
       name: 'Nannan Zhang',
-      role: isZh ? '算法工程' : 'Algorithm Engineer',
+      role: isZh ? '核心开发成员' : 'Core Developer',
       link: 'https://moria5161.github.io/',
-      desc: isZh ? '算法优化与性能调优' : 'Algorithm optimization and performance tuning',
+      desc: isZh ? '核心功能开发与项目管理' : 'Core functionality and project management',
     },
     {
       name: 'Xinyu Lu',
-      role: isZh ? '主要开发' : 'Lead Developer',
+      role: isZh ? '核心开发成员' : 'Core Developer',
       link: 'https://x1nyulu.github.io/',
       desc: isZh ? '核心功能开发与项目管理' : 'Core functionality and project management',
     },
     {
       name: 'Zhengyan Pan',
-      role: isZh ? '功能验证' : 'Functional Validator',
+      role: isZh ? '部署与安全维护' : 'Deployment & Security',
       link: null,
-      desc: isZh ? '算法验证与文档整理' : 'Algorithm validation and documentation',
+      desc: isZh ? '项目部署管理与安全维护' : 'Project deployment management and security maintenance',
     },
   ];
 
