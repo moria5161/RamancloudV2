@@ -1,0 +1,15 @@
+[Unit]
+Description=RamanCloud V2 Preprocessing Backend
+After=network.target
+
+[Service]
+Type=simple
+User=room
+WorkingDirectory=/media/ramancloud_rebuild/backend
+ExecStart=/home/room/intel/intelpython3/bin/python app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
