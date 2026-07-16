@@ -700,6 +700,26 @@ def get_hyperspectral_pixel(dataset_id: str, x: int = 0, y: int = 0) -> Dict[str
     }
 
 
+@app.get("/api/hyperspectral-spectrum/{dataset_id}")
+def get_hyperspectral_spectrum(dataset_id: str, index: int = 0) -> Dict[str, Any]:
+    if dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail="Dataset not found or expired.")
+    dataset = DATASETS[dataset_id]
+    data = dataset["data"]
+    if data.ndim != 2:
+        raise HTTPException(status_code=400, detail="Indexed spectra are only available for time-series datasets.")
+    row = int(max(0, min(index, data.shape[0] - 1)))
+    return {
+        "code": 0,
+        "msg": "Time-series spectrum loaded",
+        "data": {
+            "index": row,
+            "wavenumber": dataset["wavenumber"].tolist(),
+            "intensity": rounded_list(data[row]),
+        },
+    }
+
+
 @app.post("/api/download")
 def download(payload: DownloadPayload) -> Response:
     filename = payload.filename or "processed.txt"
