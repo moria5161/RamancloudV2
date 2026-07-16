@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, AlertCircle, Layers, Image, Activity, Crosshair, Map } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
-import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap } from '../components/HyperspectralChart';
+import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap } from '../components/HyperspectralChart';
 import ControlPanel from '../components/ControlPanel';
 import axios from 'axios';
 import { usePreferences } from '../i18n';
@@ -31,8 +31,11 @@ export default function HyperspectralProcessing() {
   const [activeTab, setActiveTab] = useState('imaging');
   const [selectedWN, setSelectedWN] = useState(null);
   const [selectedPixel, setSelectedPixel] = useState(null); // {x, y}
+  const [selectedSeriesIndex, setSelectedSeriesIndex] = useState(null);
   const [rawPixelSpectrum, setRawPixelSpectrum] = useState(null);
   const [processedPixelSpectrum, setProcessedPixelSpectrum] = useState(null);
+  const [rawSeriesSpectrum, setRawSeriesSpectrum] = useState(null);
+  const [processedSeriesSpectrum, setProcessedSeriesSpectrum] = useState(null);
   const [uploadInstrument, setUploadInstrument] = useState('Horiba');
   const [uploadMode, setUploadMode] = useState('imaging');
   const fileInputRef = useRef(null);
@@ -55,8 +58,11 @@ export default function HyperspectralProcessing() {
         setProcessedMean(null);
         setProcessedData(null);
         setSelectedPixel(null);
+        setSelectedSeriesIndex(res.data.mode === 'time_series' ? 0 : null);
         setRawPixelSpectrum(null);
         setProcessedPixelSpectrum(null);
+        setRawSeriesSpectrum(null);
+        setProcessedSeriesSpectrum(null);
         setCutRange([Math.min(...wn), Math.max(...wn)]);
         setSelectedWN(res.data.preview_wavenumber ?? Math.round((Math.min(...wn) + Math.max(...wn)) / 2));
         setSteps([]);
@@ -89,8 +95,11 @@ export default function HyperspectralProcessing() {
         setProcessedMean(null);
         setProcessedData(null);
         setSelectedPixel(null);
+        setSelectedSeriesIndex(res.data.mode === 'time_series' ? 0 : null);
         setRawPixelSpectrum(null);
         setProcessedPixelSpectrum(null);
+        setRawSeriesSpectrum(null);
+        setProcessedSeriesSpectrum(null);
         setCutRange([Math.min(...wn), Math.max(...wn)]);
         setSelectedWN(res.data.preview_wavenumber ?? Math.round((Math.min(...wn) + Math.max(...wn)) / 2));
         setSteps([]);
@@ -122,6 +131,7 @@ export default function HyperspectralProcessing() {
         setProcessedMean({ wavenumber: res.data.wavenumber, intensity: res.data.mean_spectrum });
         setProcessedData(res.data);
         setProcessedPixelSpectrum(null);
+        setProcessedSeriesSpectrum(null);
       } else {
         showError(res.msg);
       }
@@ -164,16 +174,22 @@ export default function HyperspectralProcessing() {
     setProcessedMean(null);
     setProcessedData(null);
     setProcessedPixelSpectrum(null);
+    setProcessedSeriesSpectrum(null);
     setSteps([]);
   };
 
   const handleHeatmapClick = useCallback((event) => {
     if (!event.points?.length) return;
     const pt = event.points[0];
+    if (isTimeSeries) {
+      setSelectedSeriesIndex(Math.round(pt.x));
+      setActiveTab('pixel');
+      return;
+    }
     const scale = rawData?.preview_scale || 1;
     setSelectedPixel({ x: Math.round(pt.x * scale), y: Math.round(pt.y * scale) });
     setActiveTab('pixel');
-  }, [rawData?.preview_scale]);
+  }, [rawData?.preview_scale, isTimeSeries]);
 
   const fetchSlice = useCallback(async (datasetId, value) => {
     if (!datasetId || value == null) return null;
@@ -231,6 +247,31 @@ export default function HyperspectralProcessing() {
     return () => { cancelled = true; };
   }, [selectedPixel, rawData?.dataset_id, processedData?.processed_dataset_id, isImaging]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSeriesSpectra() {
+      if (selectedSeriesIndex == null || !rawData?.dataset_id || !isTimeSeries) return;
+      try {
+        const rawReq = axios.get(`${API_BASE}/api/hyperspectral-spectrum/${rawData.dataset_id}`, {
+          params: { index: selectedSeriesIndex },
+        });
+        const processedReq = processedData?.processed_dataset_id
+          ? axios.get(`${API_BASE}/api/hyperspectral-spectrum/${processedData.processed_dataset_id}`, {
+              params: { index: selectedSeriesIndex },
+            })
+          : null;
+        const [rawRes, processedRes] = await Promise.all([rawReq, processedReq]);
+        if (cancelled) return;
+        setRawSeriesSpectrum(rawRes.data.code === 0 ? rawRes.data.data : null);
+        setProcessedSeriesSpectrum(processedRes?.data?.code === 0 ? processedRes.data.data : null);
+      } catch (e) {
+        if (!cancelled) showError('Failed to load time-series spectrum.');
+      }
+    }
+    loadSeriesSpectra();
+    return () => { cancelled = true; };
+  }, [selectedSeriesIndex, rawData?.dataset_id, processedData?.processed_dataset_id, isTimeSeries]);
+
   return (
     <div className="flex h-full">
       <div className="flex-1 flex flex-col min-w-0 relative">
@@ -245,12 +286,12 @@ export default function HyperspectralProcessing() {
             {/* Tab switcher */}
             {hasData && (
               <div className="flex bg-white/5 rounded-lg p-0.5">
-                {TABS.filter(tab => tab.id !== 'imaging' || isImaging).map(({ id, labelKey, icon: Icon }) => (
+                {TABS.map(({ id, labelKey, icon: Icon }) => (
                   <button key={id} onClick={() => setActiveTab(id)}
                     className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-md transition-all ${
                       activeTab === id ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-500 hover:text-gray-300'
                     }`}>
-                    <Icon className="w-3 h-3" /> {t(labelKey)}
+                    <Icon className="w-3 h-3" /> {t(id === 'imaging' && isTimeSeries ? 'timeSeries' : labelKey)}
                   </button>
                 ))}
               </div>
@@ -351,13 +392,27 @@ export default function HyperspectralProcessing() {
 
                 {/* Time Series Tab */}
                 {activeTab === 'imaging' && isTimeSeries && (
-                  <TimeSeriesHeatmap
-                    data2D={rawData.preview || rawData.mean_spectrum}
-                    wavenumber={rawData.wavenumber}
-                    title="Time Series Heatmap"
-                    height={window.innerHeight - 280}
-                    colorscale="Jet"
-                  />
+                  processedData?.preview ? (
+                    <CompareTimeSeriesHeatmap
+                      rawData2D={rawData.preview || rawData.mean_spectrum}
+                      processedData2D={processedData.preview}
+                      rawWavenumber={rawData.wavenumber}
+                      processedWavenumber={processedData.wavenumber}
+                      title="Raw (top) vs Processed (bottom)"
+                      height={window.innerHeight - 280}
+                      colorscale="Jet"
+                      onHeatmapClick={handleHeatmapClick}
+                    />
+                  ) : (
+                    <TimeSeriesHeatmap
+                      data2D={rawData.preview || rawData.mean_spectrum}
+                      wavenumber={rawData.wavenumber}
+                      title="Time Series Heatmap"
+                      height={window.innerHeight - 280}
+                      colorscale="Jet"
+                      onHeatmapClick={handleHeatmapClick}
+                    />
+                  )
                 )}
 
                 {/* Average Spectrum Tab */}
@@ -399,6 +454,33 @@ export default function HyperspectralProcessing() {
                       rawSpectrum={rawPixelSpectrum?.intensity}
                       processedSpectrum={processedPixelSpectrum?.intensity}
                       processedWavenumber={processedPixelSpectrum?.wavenumber}
+                      height={window.innerHeight - 360}
+                    />
+                  </div>
+                )}
+
+                {/* Time Series Single Spectrum Tab */}
+                {activeTab === 'pixel' && isTimeSeries && (
+                  <div className="space-y-4">
+                    <div className="flex gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500">{t('timeIndex')}</label>
+                        <input type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedSeriesIndex ?? 0}
+                          onChange={e => setSelectedSeriesIndex(parseInt(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
+                      </div>
+                      {selectedSeriesIndex == null && (
+                        <span className="text-xs text-gray-600 self-end">{t('selectTimeHint')}</span>
+                      )}
+                    </div>
+                    <PixelSpectrum
+                      wavenumber={rawSeriesSpectrum?.wavenumber || rawData.wavenumber}
+                      pixelX={selectedSeriesIndex ?? 0}
+                      pixelY={0}
+                      rawSpectrum={rawSeriesSpectrum?.intensity}
+                      processedSpectrum={processedSeriesSpectrum?.intensity}
+                      processedWavenumber={processedSeriesSpectrum?.wavenumber}
+                      title={`${t('spectrumAtTime')} ${selectedSeriesIndex ?? 0}`}
                       height={window.innerHeight - 360}
                     />
                   </div>

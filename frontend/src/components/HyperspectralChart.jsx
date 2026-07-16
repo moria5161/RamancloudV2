@@ -27,6 +27,11 @@ const equalPixelYAxis = {
   constrain: 'domain',
 };
 
+const transpose2D = (matrix) => {
+  if (!Array.isArray(matrix) || matrix.length === 0 || !Array.isArray(matrix[0])) return [[]];
+  return matrix[0].map((_, col) => matrix.map(row => row[col]));
+};
+
 // ============================================================
 // Imaging Heatmap
 // ============================================================
@@ -106,9 +111,10 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
 // ============================================================
 // Time Series Heatmap
 // ============================================================
-export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscale }) {
+export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscale, onHeatmapClick }) {
+  const heatmapZ = useMemo(() => transpose2D(data2D), [data2D]);
   const traces = [{
-    z: data2D || [[]],
+    z: heatmapZ,
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
     colorbar: { title: 'Intensity', titleside: 'right', thickness: 12, len: 0.6 },
@@ -127,6 +133,68 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
         yaxis: { title: 'Wavenumber (cm⁻¹)', gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
+      onClick={onHeatmapClick}
+      style={{ width: '100%' }}
+      useResizeHandler={true}
+    />
+  );
+}
+
+// ============================================================
+// Compare Time Series (Raw vs Processed stacked)
+// ============================================================
+export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenumber, processedWavenumber, title, height, colorscale, onHeatmapClick }) {
+  const hasProcessed = Array.isArray(processedData2D) && processedData2D.length > 0;
+  const rawZ = useMemo(() => transpose2D(rawData2D), [rawData2D]);
+  const processedZ = useMemo(() => transpose2D(processedData2D), [processedData2D]);
+  const traces = [
+    {
+      z: rawZ,
+      type: 'heatmap',
+      colorscale: colorscale || 'Jet',
+      colorbar: { title: 'Raw', titleside: 'right', thickness: 10, len: hasProcessed ? 0.42 : 0.6, y: hasProcessed ? 0.75 : 0.5 },
+      y: rawWavenumber,
+      name: 'Raw',
+      xaxis: 'x',
+      yaxis: 'y',
+      hovertemplate: 'Time %{x}<br>WN: %{y:.1f} cm⁻¹<br>Raw: %{z:.2f}<extra></extra>',
+    },
+  ];
+
+  if (hasProcessed) {
+    traces.push({
+      z: processedZ,
+      type: 'heatmap',
+      colorscale: colorscale || 'Jet',
+      colorbar: { title: 'Processed', titleside: 'right', thickness: 10, len: 0.42, y: 0.25 },
+      y: processedWavenumber || rawWavenumber,
+      name: 'Processed',
+      xaxis: 'x2',
+      yaxis: 'y2',
+      hovertemplate: 'Time %{x}<br>WN: %{y:.1f} cm⁻¹<br>Processed: %{z:.2f}<extra></extra>',
+    });
+  }
+
+  return (
+    <Plot
+      data={traces}
+      layout={{
+        ...darkLayout,
+        height: height || 600,
+        title: title || (hasProcessed ? 'Raw (top) vs Processed (bottom)' : 'Time Series Heatmap'),
+        ...(hasProcessed ? {
+          grid: { rows: 2, columns: 1, subplots: [['xy'], ['xy2']], roworder: 'top to bottom' },
+          xaxis: { title: 'Time Index', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1] },
+          yaxis: { title: 'Wavenumber (cm⁻¹)', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.54, 1] },
+          xaxis2: { title: 'Time Index', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1] },
+          yaxis2: { title: 'Wavenumber (cm⁻¹)', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.02, 0.48] },
+        } : {
+          xaxis: { title: 'Time Index', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
+          yaxis: { title: 'Wavenumber (cm⁻¹)', gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
+        }),
+      }}
+      config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
+      onClick={onHeatmapClick}
       style={{ width: '100%' }}
       useResizeHandler={true}
     />
@@ -261,9 +329,9 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
           title: procZ ? 'Raw (top) vs Processed (bottom)' : 'Raw Imaging',
           ...(procZ ? {
             xaxis: { ...equalPixelXAxis, domain: [0, 1] },
-            yaxis: { ...equalPixelYAxis, domain: [0.52, 1] },
+            yaxis: { ...equalPixelYAxis, domain: [0.54, 1] },
             xaxis2: { ...equalPixelXAxis, domain: [0, 1] },
-            yaxis2: { ...equalPixelYAxis, scaleanchor: 'x2', domain: [0, 0.43] },
+            yaxis2: { ...equalPixelYAxis, scaleanchor: 'x2', domain: [0.02, 0.48] },
           } : {
             xaxis: equalPixelXAxis,
             yaxis: equalPixelYAxis,
