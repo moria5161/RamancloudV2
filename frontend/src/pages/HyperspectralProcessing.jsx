@@ -41,6 +41,10 @@ export default function HyperspectralProcessing() {
   const fileInputRef = useRef(null);
   const sliceTimerRef = useRef(null);
 
+  const hasData = rawData !== null;
+  const isImaging = mode === 'imaging';
+  const isTimeSeries = mode === 'time_series';
+
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 5000); };
 
   // Load demo hyperspectral data
@@ -217,10 +221,6 @@ export default function HyperspectralProcessing() {
       }
     }, 120);
   }, [rawData?.dataset_id, processedData?.processed_dataset_id, fetchSlice]);
-
-  const hasData = rawData !== null;
-  const isImaging = mode === 'imaging';
-  const isTimeSeries = mode === 'time_series';
 
   useEffect(() => {
     let cancelled = false;
