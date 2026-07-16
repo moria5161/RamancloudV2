@@ -186,7 +186,7 @@ export default function HyperspectralProcessing() {
     if (!event.points?.length) return;
     const pt = event.points[0];
     if (isTimeSeries) {
-      setSelectedSeriesIndex(Math.round(pt.x));
+      setSelectedSeriesIndex(Math.round(pt.y));
       setActiveTab('pixel');
       return;
     }
