@@ -60,6 +60,42 @@ cd /media/ramancloud_rebuild
 ./scripts/healthcheck.sh
 ```
 
+## TLS Certificate Renewal
+
+The domain uses a free Let's Encrypt certificate managed by `certbot`.
+The system timer is enabled and runs twice daily:
+
+```bash
+systemctl status certbot.timer
+systemctl list-timers certbot.timer
+```
+
+When certbot renews `ramancloud.xmu.edu.cn`, it runs this deploy hook:
+
+```text
+/usr/local/sbin/ramancloud-renew-cert.sh
+```
+
+The hook is versioned in this repo as:
+
+```text
+scripts/renew_cert.sh
+```
+
+It copies the renewed certificate from:
+
+```text
+/etc/letsencrypt/live/ramancloud.xmu.edu.cn/
+```
+
+to the Nginx/BaoTa certificate directories and reloads Nginx after `nginx -t` succeeds.
+
+Manual sync/test:
+
+```bash
+sudo /usr/local/sbin/ramancloud-renew-cert.sh
+```
+
 ## Logs
 
 Backend:
