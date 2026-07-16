@@ -406,7 +406,7 @@ a:active {
 .settings-dock {
   position: fixed;
   left: 196px;
-  bottom: 82px;
+  bottom: 42px;
   z-index: 30;
   display: flex;
   flex-direction: column;
