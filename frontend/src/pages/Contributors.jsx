@@ -13,22 +13,16 @@ export default function Contributors() {
       desc: isZh ? '算法优化与性能调优' : 'Algorithm optimization and performance tuning',
     },
     {
-      name: 'Zhengyan Pan',
-      role: isZh ? '功能验证' : 'Functional Validator',
-      link: null,
-      desc: isZh ? '算法验证与文档整理' : 'Algorithm validation and documentation',
-    },
-    {
       name: 'Xinyu Lu',
       role: isZh ? '主要开发' : 'Lead Developer',
       link: 'https://x1nyulu.github.io/',
       desc: isZh ? '核心功能开发与项目管理' : 'Core functionality and project management',
     },
     {
-      name: 'Hao Ma',
-      role: isZh ? 'UI/UX 设计' : 'UI/UX Designer',
-      link: 'https://www.researchgate.net/profile/Hao-Ma-20',
-      desc: isZh ? '用户界面与体验设计' : 'User interface design',
+      name: 'Zhengyan Pan',
+      role: isZh ? '功能验证' : 'Functional Validator',
+      link: null,
+      desc: isZh ? '算法验证与文档整理' : 'Algorithm validation and documentation',
     },
   ];
 
@@ -84,6 +78,7 @@ export default function Contributors() {
               { name: 'Prof. Bin Ren', link: 'https://chem.xmu.edu.cn/en/info/1010/1352.htm' },
               { name: 'Prof. Guokun Liu', link: 'https://mel2.xmu.edu.cn/staff.asp?tid=587' },
               { name: 'Prof. Xiang Wang', link: 'https://chem.xmu.edu.cn/en/info/1010/1815.htm' },
+              { name: 'Prof. Hao Ma', link: 'https://www.researchgate.net/profile/Hao-Ma-20' },
             ].map(({ name, link }) => (
               <a key={name} href={link} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-gray-300 hover:text-indigo-400 transition-colors">
