@@ -10,3 +10,4 @@ __pycache__/
 .env.*
 backend/__pycache__/
 backend/.pytest_cache/
+/EXPERIMENTS.md
