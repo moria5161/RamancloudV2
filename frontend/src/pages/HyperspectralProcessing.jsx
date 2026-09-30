@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Upload, AlertCircle, Layers, Image, Activity, Crosshair, Map } from 'lucide-react';
+import { Upload, AlertCircle, Image, Activity, Crosshair, Map } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
 import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap } from '../components/HyperspectralChart';
 import ControlPanel from '../components/ControlPanel';
@@ -308,9 +308,6 @@ export default function HyperspectralProcessing() {
           {!hasData ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-6 animate-fade-in">
-                <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20 flex items-center justify-center">
-                  <Layers className="w-10 h-10 text-purple-400" />
-                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-300">{t('loadHyperspectralData')}</h3>
                   <p className="text-sm text-gray-500 mt-1">{t('loadHyperspectralDataDesc')}</p>
