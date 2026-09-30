@@ -218,6 +218,16 @@ html, body, #root {
 .nav-liquid {
   position: relative;
   overflow: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-liquid:hover,
+.nav-liquid:active {
+  transform: none;
+}
+
+.nav-liquid:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .nav-liquid::after,

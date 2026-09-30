@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, FileUp, Database, AlertCircle } from 'lucide-react';
+import { Upload, FileUp, AlertCircle } from 'lucide-react';
 import SpectralChart, { CompareChart } from '../components/SpectralChart';
 import ControlPanel from '../components/ControlPanel';
 import axios from 'axios';
@@ -163,9 +163,6 @@ export default function SpectralProcessing() {
           {!hasData ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-6 animate-fade-in">
-                <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
-                  <Database className="w-10 h-10 text-indigo-400" />
-                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-300">{t('loadSpectralData')}</h3>
                   <p className="text-sm text-gray-500 mt-1">{t('loadSpectralDataDesc')}</p>
