@@ -21,6 +21,8 @@ An online workspace for Raman spectral preprocessing.
 
 Use **Extra Tools** for file operations and **Tutorial** for guidance.
 
+To run your own copy, see the [local setup guide](LOCAL_SETUP.md).
+
 ## Architecture
 
 React and Plotly provide the interactive workspace; FastAPI handles data loading and processing. Nginx serves the frontend and forwards API requests to the backend.

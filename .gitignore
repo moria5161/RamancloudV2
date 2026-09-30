@@ -11,3 +11,4 @@ __pycache__/
 backend/__pycache__/
 backend/.pytest_cache/
 /EXPERIMENTS.md
+/DEPLOYMENT.md
