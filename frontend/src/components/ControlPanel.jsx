@@ -38,7 +38,7 @@ export default function ControlPanel({
           >
             <option value="">{t('uploadFileEllipsis')}</option>
             {demos.map(d => (
-              <option key={d} value={d}>{d === 'bacteria' ? 'Bacteria' : d === 'ulf' ? 'ULF Raman' : 'Tutorial Raman'}</option>
+              <option key={d} value={d}>{d === 'imaging_horiba' ? t('imagingDemo') : d === 'timeseries_horiba' ? t('timeSeriesDemo') : d === 'bacteria' ? 'Bacteria' : d === 'ulf' ? 'ULF Raman' : 'Tutorial Raman'}</option>
             ))}
           </select>
           {fileName && (
