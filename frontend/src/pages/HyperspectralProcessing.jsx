@@ -1,10 +1,14 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Upload, AlertCircle, Image, Activity, Crosshair, Map } from 'lucide-react';
+import { Upload, Image, Activity, Crosshair, Map } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
 import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap } from '../components/HyperspectralChart';
 import ControlPanel from '../components/ControlPanel';
+import ControlDock from '../components/ControlDock';
 import axios from 'axios';
 import { usePreferences } from '../i18n';
+import useWorkspaceTask from '../hooks/useWorkspaceTask';
+import WorkspaceFeedback from '../components/WorkspaceFeedback';
+import { createProcessingRecord, exportResult, pipelineSignature } from '../utils/processingRecord';
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -40,146 +44,162 @@ export default function HyperspectralProcessing() {
   const [uploadMode, setUploadMode] = useState('imaging');
   const fileInputRef = useRef(null);
   const sliceTimerRef = useRef(null);
+  const sliceVersion = useRef(0);
+  const task = useWorkspaceTask(t);
+  const [demoName, setDemoName] = useState('');
+  const [runRecord, setRunRecord] = useState(null);
+  const [includeRecord, setIncludeRecord] = useState(true);
+  const [sharedColorScale, setSharedColorScale] = useState(true);
+  const isStale = !!runRecord && pipelineSignature(steps) !== JSON.stringify(runRecord.steps);
+
+  const handleStepsChange = nextSteps => {
+    setSteps(nextSteps);
+    const cut = nextSteps.find(step => step.type === 'cut');
+    if (cut) setCutRange([cut.params.start, cut.params.end]);
+  };
+
+  const handleCutRangeChange = range => {
+    setCutRange(range);
+    setSteps(previous => previous.map(step => step.type === 'cut'
+      ? { ...step, params: { ...step.params, start: range[0], end: range[1] } }
+      : step));
+  };
 
   const hasData = rawData !== null;
   const isImaging = mode === 'imaging';
   const isTimeSeries = mode === 'time_series';
 
-  const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 5000); };
+  const showError = msg => setError(msg);
 
-  // Load demo hyperspectral data
-  const loadDemo = useCallback(async (name) => {
-    if (!name) return;
-    try {
-      setError(null);
+  const clearSelections = () => {
+    setSelectedPixel(null);
+    setRawPixelSpectrum(null);
+    setProcessedPixelSpectrum(null);
+    setRawSeriesSpectrum(null);
+    setProcessedSeriesSpectrum(null);
+    sliceVersion.current += 1;
+    clearTimeout(sliceTimerRef.current);
+  };
+
+  const applyData = (data, demo = '') => {
+    clearSelections();
+    setRawData(data);
+    setMode(data.mode);
+    setFileName(data.filename);
+    setDemoName(demo);
+    setMeanSpectrum({ wavenumber: data.wavenumber, intensity: data.mean_spectrum });
+    setProcessedMean(null);
+    setProcessedData(null);
+    setRunRecord(null);
+    setSelectedSeriesIndex(data.mode === 'time_series' ? 0 : null);
+    setCutRange([Math.min(...data.wavenumber), Math.max(...data.wavenumber)]);
+    setSelectedWN(data.preview_wavenumber ?? data.wavenumber[Math.floor(data.wavenumber.length / 2)]);
+    setSteps([]);
+    setActiveTab('imaging');
+  };
+
+  const loadDemo = name => {
+    if (!name || task.busy) return;
+    setError(null);
+    task.run('readingData', async () => {
       const { data: res } = await axios.get(`${API_BASE}/api/demo-hyperspectral/${name}`);
-      if (res.code === 0) {
-        setRawData(res.data);
-        setMode(res.data.mode);
-        setFileName(res.data.filename);
-        const wn = res.data.wavenumber;
-        setMeanSpectrum({ wavenumber: wn, intensity: res.data.mean_spectrum });
-        setProcessedMean(null);
-        setProcessedData(null);
-        setSelectedPixel(null);
-        setSelectedSeriesIndex(res.data.mode === 'time_series' ? 0 : null);
-        setRawPixelSpectrum(null);
-        setProcessedPixelSpectrum(null);
-        setRawSeriesSpectrum(null);
-        setProcessedSeriesSpectrum(null);
-        setCutRange([Math.min(...wn), Math.max(...wn)]);
-        setSelectedWN(res.data.preview_wavenumber ?? Math.round((Math.min(...wn) + Math.max(...wn)) / 2));
-        setSteps([]);
-        setActiveTab('imaging');
-      } else {
-        showError(res.msg);
-      }
-    } catch (e) {
-      showError('Failed to load demo. Is the backend running?');
-    }
-  }, []);
+      if (res.code !== 0) throw new Error(res.msg);
+      applyData(res.data, name);
+    });
+  };
 
-  const handleFileUpload = useCallback(async (e) => {
+  const handleFileUpload = e => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setError(null);
+    e.target.value = '';
+    if (!file || task.busy) return;
+    setError(null);
+    task.run('uploadingData', async ({ uploadProgress }) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('instrument', uploadInstrument);
       formData.append('mode', uploadMode);
+      const { data: res } = await axios.post(`${API_BASE}/api/upload-hyperspectral`, formData, { onUploadProgress: uploadProgress });
+      if (res.code !== 0) throw new Error(res.msg);
+      applyData(res.data);
+    });
+  };
 
-      const { data: res } = await axios.post(`${API_BASE}/api/upload-hyperspectral`, formData);
-      if (res.code === 0) {
-        setRawData(res.data);
-        setMode(res.data.mode);
-        setFileName(res.data.filename);
-        const wn = res.data.wavenumber;
-        setMeanSpectrum({ wavenumber: wn, intensity: res.data.mean_spectrum });
-        setProcessedMean(null);
-        setProcessedData(null);
-        setSelectedPixel(null);
-        setSelectedSeriesIndex(res.data.mode === 'time_series' ? 0 : null);
-        setRawPixelSpectrum(null);
-        setProcessedPixelSpectrum(null);
-        setRawSeriesSpectrum(null);
-        setProcessedSeriesSpectrum(null);
-        setCutRange([Math.min(...wn), Math.max(...wn)]);
-        setSelectedWN(res.data.preview_wavenumber ?? Math.round((Math.min(...wn) + Math.max(...wn)) / 2));
-        setSteps([]);
-      } else {
-        showError(res.msg);
-      }
-    } catch (e) {
-      showError('Upload failed. Is the backend running?');
-    }
-  }, [uploadInstrument, uploadMode]);
-
-  const handleProcess = useCallback(async () => {
-    if (!rawData?.dataset_id && !rawData?.spectra) return;
-    setIsProcessing(true);
+  const handleProcess = () => {
+    if (!rawData?.dataset_id || !steps.length || task.busy) return;
     setError(null);
-    try {
-      const pipelineSteps = steps.map(s => ({ type: s.type, method: s.method, params: s.params }));
-
-      const { data: res } = await axios.post(`${API_BASE}/api/process-hyperspectral`, {
-        wavenumber: rawData.wavenumber,
-        dataset_id: rawData.dataset_id,
-        spectra: rawData.spectra,
-        shape: rawData.shape,
-        mode: rawData.mode,
-        steps: pipelineSteps,
-      });
-
-      if (res.code === 0) {
+    task.run('processing', async () => {
+      setIsProcessing(true);
+      sliceVersion.current += 1;
+      clearTimeout(sliceTimerRef.current);
+      const started = performance.now();
+      try {
+        const { data: res } = await axios.post(`${API_BASE}/api/process-hyperspectral`, {
+          wavenumber: rawData.wavenumber, dataset_id: rawData.dataset_id,
+          shape: rawData.shape, mode: rawData.mode,
+          steps: JSON.parse(pipelineSignature(steps)),
+        });
+        if (res.code !== 0) throw new Error(res.msg);
+        if (mode === 'imaging') {
+          task.setPhase('generatingPreview');
+          const value = Math.max(Math.min(...res.data.wavenumber), Math.min(Math.max(...res.data.wavenumber), selectedWN));
+          const [rawSlice, processedSlice] = await Promise.all([
+            fetchSlice(rawData.dataset_id, value),
+            fetchSlice(res.data.processed_dataset_id, value),
+          ]);
+          if (rawSlice) setRawData(previous => ({ ...previous, preview: rawSlice.preview, preview_wavenumber: rawSlice.wavenumber }));
+          if (processedSlice) res.data.preview = processedSlice.preview;
+          setSelectedWN(value);
+        }
         setProcessedMean({ wavenumber: res.data.wavenumber, intensity: res.data.mean_spectrum });
         setProcessedData(res.data);
+        setRunRecord(createProcessingRecord(fileName, mode, rawData, res.data, steps, started));
         setProcessedPixelSpectrum(null);
         setProcessedSeriesSpectrum(null);
-      } else {
-        showError(res.msg);
-      }
-    } catch (e) {
-      showError('Processing failed.');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [rawData, steps]);
+      } finally { setIsProcessing(false); }
+    });
+  };
 
-  const handleDownload = useCallback(async () => {
-    if (!processedMean) return;
-    try {
-      const { data: res } = await axios.post(
-        `${API_BASE}/api/download`,
-        processedData?.processed_dataset_id || processedData?.spectra
-          ? {
-              wavenumber: processedMean.wavenumber,
-              dataset_id: processedData.processed_dataset_id,
-              spectra: processedData.spectra,
-              shape: processedData.shape,
-              mode: mode,
-              filename: `processed_${fileName || 'mapping.txt'}`,
-            }
-          : {
-              wavenumber: processedMean.wavenumber,
-              intensity: processedMean.intensity,
-              filename: 'processed_hyperspectral_mean.txt',
-            },
-        { responseType: 'blob' }
-      );
-      const url = URL.createObjectURL(new Blob([res]));
-      const a = document.createElement('a');
-      a.href = url; a.download = `processed_${fileName || 'hyperspectral.txt'}`; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) { showError('Download failed'); }
-  }, [processedMean, processedData, fileName, mode]);
+  const handleDownload = () => {
+    if (!processedData || isStale || task.busy) return;
+    task.run('preparingDownload', async () => {
+      const filename = `processed_${fileName || 'hyperspectral.txt'}`;
+      const { data } = await axios.post(`${API_BASE}/api/download`, {
+        wavenumber: processedData.wavenumber,
+        dataset_id: processedData.processed_dataset_id,
+        shape: processedData.shape, mode, filename,
+      }, { responseType: 'blob' });
+      await exportResult(data, filename, {
+        ...runRecord, instrument: demoName ? 'Horiba' : uploadInstrument,
+        columns: 'wavenumber, then one intensity column per spectrum',
+        spatial_order: mode === 'imaging' ? 'row-major (Y, X); X varies fastest' : 'time index ascending',
+      }, includeRecord);
+    });
+  };
 
   const handleReset = () => {
+    sliceVersion.current += 1;
+    clearTimeout(sliceTimerRef.current);
     setProcessedMean(null);
     setProcessedData(null);
+    setRunRecord(null);
     setProcessedPixelSpectrum(null);
     setProcessedSeriesSpectrum(null);
     setSteps([]);
+  };
+
+  const handleClear = () => {
+    handleReset();
+    clearSelections();
+    setRawData(null);
+    setMeanSpectrum(null);
+    setFileName(null);
+    setDemoName('');
+    setMode(null);
+    setSelectedWN(null);
+    setSelectedSeriesIndex(null);
+    setCutRange(null);
+    setError(null);
+    task.setError(null);
   };
 
   const handleHeatmapClick = useCallback((event) => {
@@ -205,19 +225,23 @@ export default function HyperspectralProcessing() {
 
   const handleWavenumberChange = useCallback((value) => {
     setSelectedWN(value);
+    const version = ++sliceVersion.current;
     if (sliceTimerRef.current) clearTimeout(sliceTimerRef.current);
     sliceTimerRef.current = setTimeout(async () => {
       try {
-        const rawSlice = await fetchSlice(rawData?.dataset_id, value);
+        const [rawSlice, processedSlice] = await Promise.all([
+          fetchSlice(rawData?.dataset_id, value),
+          fetchSlice(processedData?.processed_dataset_id, value),
+        ]);
+        if (version !== sliceVersion.current) return;
         if (rawSlice) {
           setRawData(prev => prev ? { ...prev, preview: rawSlice.preview, preview_wavenumber: rawSlice.wavenumber } : prev);
         }
-        const processedSlice = await fetchSlice(processedData?.processed_dataset_id, value);
         if (processedSlice) {
           setProcessedData(prev => prev ? { ...prev, preview: processedSlice.preview, preview_wavenumber: processedSlice.wavenumber } : prev);
         }
       } catch (e) {
-        showError('Failed to load imaging slice.');
+        if (version === sliceVersion.current) showError(t('requestFailed'));
       }
     }, 120);
   }, [rawData?.dataset_id, processedData?.processed_dataset_id, fetchSlice]);
@@ -240,7 +264,7 @@ export default function HyperspectralProcessing() {
         setRawPixelSpectrum(rawRes.data.code === 0 ? rawRes.data.data : null);
         setProcessedPixelSpectrum(processedRes?.data?.code === 0 ? processedRes.data.data : null);
       } catch (e) {
-        if (!cancelled) showError('Failed to load pixel spectrum.');
+        if (!cancelled) showError(t('requestFailed'));
       }
     }
     loadPixelSpectra();
@@ -265,7 +289,7 @@ export default function HyperspectralProcessing() {
         setRawSeriesSpectrum(rawRes.data.code === 0 ? rawRes.data.data : null);
         setProcessedSeriesSpectrum(processedRes?.data?.code === 0 ? processedRes.data.data : null);
       } catch (e) {
-        if (!cancelled) showError('Failed to load time-series spectrum.');
+        if (!cancelled) showError(t('requestFailed'));
       }
     }
     loadSeriesSpectra();
@@ -273,10 +297,11 @@ export default function HyperspectralProcessing() {
   }, [selectedSeriesIndex, rawData?.dataset_id, processedData?.processed_dataset_id, isTimeSeries]);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full relative">
+      <WorkspaceFeedback task={task} error={error} onDismiss={() => setError(null)} />
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 glass">
+        <div className="workspace-toolbar flex items-center justify-between px-5 py-3 border-b border-white/5 glass">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
             <h2 className="text-sm font-semibold text-gray-200">{t('hyperspectralWorkspace')}</h2>
@@ -296,7 +321,7 @@ export default function HyperspectralProcessing() {
                 ))}
               </div>
             )}
-            <button onClick={() => fileInputRef.current?.click()}
+            <button disabled={task.busy} onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-all flex items-center gap-1">
               <Upload className="w-3 h-3" /> {t('upload')}
             </button>
@@ -326,39 +351,42 @@ export default function HyperspectralProcessing() {
                   </select>
                 </div>
                 <div className="flex gap-3 justify-center">
-                  <button onClick={() => fileInputRef.current?.click()}
+                  <button disabled={task.busy} onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium hover:from-purple-500 hover:to-pink-500 transition-all shadow-lg shadow-purple-500/20">
                     <Upload className="w-4 h-4" /> {t('uploadFile')}
                   </button>
-                  <button onClick={() => loadDemo('imaging_horiba')}
+                  <button disabled={task.busy} onClick={() => loadDemo('imaging_horiba')}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 text-gray-300 text-sm font-medium hover:bg-white/10 border border-white/5 transition-all">
                     <Image className="w-4 h-4" /> {t('imagingDemo')}
                   </button>
-                  <button onClick={() => loadDemo('timeseries_horiba')}
+                  <button disabled={task.busy} onClick={() => loadDemo('timeseries_horiba')}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 text-gray-300 text-sm font-medium hover:bg-white/10 border border-white/5 transition-all">
                     <Activity className="w-4 h-4" /> {t('timeSeriesDemo')}
                   </button>
                 </div>
-                {error && (
-                  <div className="flex items-center gap-2 text-red-400 bg-red-500/10 rounded-lg px-4 py-2 text-sm max-w-md mx-auto">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-                  </div>
-                )}
               </div>
             </div>
           ) : (
             <div className="h-full animate-fade-in space-y-4">
               {/* Dataset info bar */}
-              <div className="glass rounded-xl p-3 border border-white/5 flex items-center gap-4 text-xs text-gray-500">
+              <div className="glass rounded-lg p-3 border border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
                 <Image className="w-4 h-4 text-purple-400" />
                 <span>{t('shape')}: {rawData.shape?.join(' × ')}</span>
                 <span>{t('spectralPoints')}: {rawData.wavenumber?.length}</span>
-                <span>{t('file')}: {fileName}</span>
+                <span className="break-all">{t('file')}: {fileName}</span>
                 {processedMean && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">{t('processed')}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">{isStale ? t('resultStale') : t('processed')}</span>
                 )}
               </div>
 
+              {activeTab === 'imaging' && processedData && (
+                <div className="flex justify-end">
+                  <div className="segmented-control" role="group" aria-label={t('colorScale')}>
+                    <button className={sharedColorScale ? 'is-active' : ''} aria-pressed={sharedColorScale} onClick={() => setSharedColorScale(true)}>{t('sharedColorScale')}</button>
+                    <button className={!sharedColorScale ? 'is-active' : ''} aria-pressed={!sharedColorScale} onClick={() => setSharedColorScale(false)}>{t('independentColorScale')}</button>
+                  </div>
+                </div>
+              )}
               {/* Tab content */}
               <div className="flex-1" style={{ height: window.innerHeight - 260 }}>
                 {/* Imaging Tab */}
@@ -371,6 +399,9 @@ export default function HyperspectralProcessing() {
                       selectedWN={selectedWN}
                       onSelectWN={handleWavenumberChange}
                       onHeatmapClick={handleHeatmapClick}
+                      selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
+                      selectedIndex={selectedSeriesIndex}
+                      sharedColorScale={sharedColorScale}
                       height={window.innerHeight - 280}
                     />
                   ) : (
@@ -380,7 +411,10 @@ export default function HyperspectralProcessing() {
                       selectedWN={selectedWN}
                       onSelectWN={handleWavenumberChange}
                       onHeatmapClick={handleHeatmapClick}
-                      title="Hyperspectral Imaging — Select Wavenumber"
+                      selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
+                      selectedIndex={selectedSeriesIndex}
+                      sharedColorScale={sharedColorScale}
+                      title={t('imaging')}
                       height={window.innerHeight - 280}
                       colorscale="Jet"
                     />
@@ -395,19 +429,25 @@ export default function HyperspectralProcessing() {
                       processedData2D={processedData.preview}
                       rawWavenumber={rawData.wavenumber}
                       processedWavenumber={processedData.wavenumber}
-                      title="Raw (top) vs Processed (bottom)"
+                      title={t('rawProcessedComparison')}
                       height={window.innerHeight - 280}
                       colorscale="Jet"
                       onHeatmapClick={handleHeatmapClick}
+                      selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
+                      selectedIndex={selectedSeriesIndex}
+                      sharedColorScale={sharedColorScale}
                     />
                   ) : (
                     <TimeSeriesHeatmap
                       data2D={rawData.preview || rawData.mean_spectrum}
                       wavenumber={rawData.wavenumber}
-                      title="Time Series Heatmap"
+                      title={t('timeSeries')}
                       height={window.innerHeight - 280}
                       colorscale="Jet"
                       onHeatmapClick={handleHeatmapClick}
+                      selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
+                      selectedIndex={selectedSeriesIndex}
+                      sharedColorScale={sharedColorScale}
                     />
                   )
                 )}
@@ -429,14 +469,14 @@ export default function HyperspectralProcessing() {
                     <div className="flex gap-4">
                       <div>
                         <label className="text-xs text-gray-500">{t('pixelX')}</label>
-                        <input type="number" value={selectedPixel?.x ?? 0}
-                          onChange={e => setSelectedPixel(p => ({ ...p, x: parseInt(e.target.value) || 0 }))}
+                        <input type="number" min="0" max={(rawData.shape?.[1] || 1) - 1} value={selectedPixel?.x ?? 0}
+                          onChange={e => setSelectedPixel(p => ({ y: p?.y ?? 0, x: Math.max(0, Math.min((rawData.shape?.[1] || 1) - 1, parseInt(e.target.value) || 0)) }))}
                           className="w-20 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
                       <div>
                         <label className="text-xs text-gray-500">{t('pixelY')}</label>
-                        <input type="number" value={selectedPixel?.y ?? 0}
-                          onChange={e => setSelectedPixel(p => ({ ...p, y: parseInt(e.target.value) || 0 }))}
+                        <input type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedPixel?.y ?? 0}
+                          onChange={e => setSelectedPixel(p => ({ x: p?.x ?? 0, y: Math.max(0, Math.min((rawData.shape?.[0] || 1) - 1, parseInt(e.target.value) || 0)) }))}
                           className="w-20 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
                       {!selectedPixel && (
@@ -463,7 +503,7 @@ export default function HyperspectralProcessing() {
                       <div>
                         <label className="text-xs text-gray-500">{t('timeIndex')}</label>
                         <input type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedSeriesIndex ?? 0}
-                          onChange={e => setSelectedSeriesIndex(parseInt(e.target.value) || 0)}
+                          onChange={e => setSelectedSeriesIndex(Math.max(0, Math.min((rawData.shape?.[0] || 1) - 1, parseInt(e.target.value) || 0)))}
                           className="w-24 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
                       {selectedSeriesIndex == null && (
@@ -490,22 +530,25 @@ export default function HyperspectralProcessing() {
         {/* Bottom info bar */}
         {hasData && (
           <div className="px-5 py-2 border-t border-white/5 flex items-center gap-4 text-xs text-gray-500">
-            <span>{t('spectralPoints')}: {isImaging ? (rawData.shape?.[0] || 1) * (rawData.shape?.[1] || 1) : rawData.time_points || 'N/A'}</span>
-            <span>{t('range')}: {rawData.wavenumber?.[0]?.toFixed(1)} – {rawData.wavenumber?.[rawData.wavenumber?.length - 1]?.toFixed(1)} cm⁻¹</span>
+            <span>{t(isImaging ? 'spatialPoints' : 'timePoints')}: {isImaging ? (rawData.shape?.[0] || 1) * (rawData.shape?.[1] || 1) : rawData.shape?.[0]}</span>
+            <span>{t('range')}: {Math.min(...rawData.wavenumber).toFixed(1)} – {Math.max(...rawData.wavenumber).toFixed(1)} cm⁻¹</span>
           </div>
         )}
       </div>
 
       {/* Right: Control Panel */}
-      <div className="w-80 shrink-0">
+      <ControlDock>
         <ControlPanel
-          steps={steps} onStepsChange={setSteps}
+          steps={steps} onStepsChange={handleStepsChange}
           onProcess={handleProcess} onDownload={handleDownload} onReset={handleReset}
-          isProcessing={isProcessing} fileName={fileName} demoName={fileName ? '' : (rawData?.filename || '')}
+          isProcessing={isProcessing} fileName={fileName} demoName={demoName}
+          hasData={hasData} busy={task.busy} hasResult={!!runRecord} isStale={isStale}
+          elapsed={runRecord?.elapsed_seconds} includeRecord={includeRecord}
+          onIncludeRecordChange={setIncludeRecord} onClear={handleClear}
           onDemoChange={loadDemo} demos={DEMOS}
-          cutRange={cutRange} onCutRangeChange={setCutRange}
+          cutRange={cutRange} onCutRangeChange={handleCutRangeChange}
         />
-      </div>
+      </ControlDock>
 
       <input ref={fileInputRef} type="file" accept=".txt" onChange={handleFileUpload} className="hidden" />
     </div>

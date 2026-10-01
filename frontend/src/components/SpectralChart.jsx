@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import Plot from 'react-plotly.js';
+import useChartLayout from '../hooks/useChartLayout';
+import { usePreferences } from '../i18n';
 
 const darkLayout = {
   paper_bgcolor: 'rgba(0,0,0,0)',
@@ -41,6 +43,8 @@ export default function SpectralChart({
   height = 500,
   showRaw = true,
 }) {
+  const layout = useChartLayout(darkLayout, rawData);
+  const { t } = usePreferences();
   const traces = [];
 
   if (rawData && showRaw) {
@@ -49,7 +53,7 @@ export default function SpectralChart({
       y: rawData.intensity,
       type: 'scatter',
       mode: 'lines',
-      name: 'Raw',
+      name: t('raw'),
       line: { color: 'rgba(148,163,184,0.5)', width: 1.5 },
       hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Raw</extra>',
     });
@@ -61,7 +65,7 @@ export default function SpectralChart({
       y: processedData.intensity,
       type: 'scatter',
       mode: 'lines',
-      name: 'Processed',
+      name: t('processed'),
       line: { color: '#0071e3', width: 2.2 },
       hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Processed</extra>',
     });
@@ -73,7 +77,7 @@ export default function SpectralChart({
       y: baselineData,
       type: 'scatter',
       mode: 'lines',
-      name: 'Baseline',
+      name: t('baseline'),
       line: { color: '#30d158', width: 1.5, dash: 'dash' },
       hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Baseline</extra>',
     });
@@ -98,15 +102,15 @@ export default function SpectralChart({
     <Plot
       data={traces}
       layout={{
-        ...darkLayout,
+        ...layout,
         height,
         shapes,
         xaxis: {
-          ...darkLayout.xaxis,
+          ...layout.xaxis,
           autorange: true,
         },
         yaxis: {
-          ...darkLayout.yaxis,
+          ...layout.yaxis,
           autorange: true,
         },
       }}
@@ -128,14 +132,16 @@ export default function SpectralChart({
  * Compare chart: raw vs processed in 2 subplots
  */
 export function CompareChart({ rawData, processedData, height = 700 }) {
+  const layout = useChartLayout(darkLayout, rawData);
+  const { t } = usePreferences();
   const traces = [
     {
       x: rawData?.wavenumber || [],
       y: rawData?.intensity || [],
       type: 'scatter',
       mode: 'lines',
-      name: 'Raw Spectrum',
-      line: { color: 'rgba(0,0,0,0.48)', width: 1.5 },
+      name: t('raw'),
+      line: { color: '#8b95a5', width: 1.5 },
       xaxis: 'x',
       yaxis: 'y',
     },
@@ -144,7 +150,7 @@ export function CompareChart({ rawData, processedData, height = 700 }) {
       y: processedData?.intensity || [],
       type: 'scatter',
       mode: 'lines',
-      name: 'Processed Spectrum',
+      name: t('processed'),
       line: { color: '#0071e3', width: 2 },
       xaxis: 'x2',
       yaxis: 'y2',
@@ -155,17 +161,14 @@ export function CompareChart({ rawData, processedData, height = 700 }) {
     <Plot
       data={traces}
       layout={{
-        grid: { rows: 2, columns: 1, subplots: [['xy'], ['xy2']], roworder: 'top to bottom' },
-        ...darkLayout,
+        grid: { rows: 2, columns: 1, subplots: [['xy'], ['x2y2']], roworder: 'top to bottom' },
+        ...layout,
         height,
-        xaxis: { ...darkLayout.xaxis, title: 'Wavenumber (cm⁻¹)', domain: [0, 1] },
-        yaxis: { ...darkLayout.yaxis, title: 'Intensity', domain: [0.52, 1] },
-        xaxis2: { ...darkLayout.xaxis, title: 'Wavenumber (cm⁻¹)', domain: [0, 1] },
-        yaxis2: { ...darkLayout.yaxis, title: 'Intensity', domain: [0, 0.43] },
-        annotations: [
-          { x: 0.5, y: 1, xref: 'paper', yref: 'paper', text: 'Raw Spectrum', showarrow: false, font: { size: 11, color: 'rgba(0,0,0,0.48)' } },
-          { x: 0.5, y: 0.48, xref: 'paper', yref: 'paper', text: 'Processed Spectrum', showarrow: false, font: { size: 11, color: '#0071e3' } },
-        ],
+        xaxis: { ...layout.xaxis, domain: [0, 1], anchor: 'y' },
+        margin: { l: 60, r: 30, t: 45, b: 50 },
+        yaxis: { ...layout.yaxis, title: `${t('raw')} · ${t('intensity')}`, domain: [0.58, 1], anchor: 'x' },
+        xaxis2: { ...layout.xaxis, domain: [0, 1], anchor: 'y2', matches: 'x' },
+        yaxis2: { ...layout.yaxis, title: `${t('processed')} · ${t('intensity')}`, domain: [0, 0.42], anchor: 'x2' },
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
       style={{ width: '100%', height: '100%' }}
