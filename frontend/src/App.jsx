@@ -13,6 +13,16 @@ import Contributors from './pages/Contributors';
 function AppShell() {
   const location = useLocation();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [visitedWorkspaces, setVisitedWorkspaces] = useState([]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/spectral' || path === '/hyperspectral') {
+      setVisitedWorkspaces(previous => previous.includes(path) ? previous : [...previous, path]);
+    }
+    const frame = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    return () => cancelAnimationFrame(frame);
+  }, [location.pathname]);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowWelcome(false), 1550);
@@ -26,11 +36,21 @@ function AppShell() {
       </div>
       <Sidebar />
       <main className="flex-1 overflow-hidden">
-        <div key={location.pathname} className="route-surface h-full overflow-hidden">
+        {[
+          ['/spectral', SpectralProcessing],
+          ['/hyperspectral', HyperspectralProcessing],
+        ].map(([path, Workspace]) => (
+          (visitedWorkspaces.includes(path) || location.pathname === path) && (
+            <div key={path} hidden={location.pathname !== path} className="workspace-route h-full overflow-hidden">
+              <Workspace />
+            </div>
+          )
+        ))}
+        <div key={location.pathname} hidden={location.pathname === '/spectral' || location.pathname === '/hyperspectral'} className="route-surface h-full overflow-hidden">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/spectral" element={<SpectralProcessing />} />
-            <Route path="/hyperspectral" element={<HyperspectralProcessing />} />
+            <Route path="/spectral" element={null} />
+            <Route path="/hyperspectral" element={null} />
             <Route path="/extra-tools" element={<ExtraTools />} />
             <Route path="/tutorial" element={<Tutorial />} />
             <Route path="/contributors" element={<Contributors />} />

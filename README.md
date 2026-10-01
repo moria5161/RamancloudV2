@@ -9,7 +9,7 @@ An online workspace for Raman spectral preprocessing.
 - Process individual spectra, time series, and hyperspectral images.
 - Arrange spectral cutting, denoising, and baseline correction in your preferred order.
 - Compare raw and processed data through spectra and heatmaps, and inspect individual spatial pixels or time points.
-- Download processed data, split or merge spectral files, and convert between supported instrument formats.
+- Download processed data with optional processing records, split or merge spectral files, and convert between supported instrument formats.
 - Switch between English and Chinese, with light and dark themes.
 
 ## Workflow

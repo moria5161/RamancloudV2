@@ -21,12 +21,12 @@ export default function Sidebar() {
     <aside className="sidebar-glass w-60 glass flex flex-col justify-between border-r border-white/5 shrink-0 z-10">
       <div>
         {/* Logo */}
-        <div className="p-5 border-b border-white/5">
+        <div className="sidebar-brand p-5 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="sidebar-logo w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
               <CloudLogo className="w-7 h-7" />
             </div>
-            <div>
+            <div className="sidebar-label">
               <h1 className="text-lg font-bold text-white tracking-tight">RamanCloud</h1>
               <p className="text-[10px] text-gray-500 -mt-0.5">{t('nextGen')}</p>
             </div>
@@ -41,6 +41,8 @@ export default function Sidebar() {
               <NavLink
                 key={to}
                 to={to}
+                title={t(labelKey)}
+                aria-label={t(labelKey)}
                 className={`nav-liquid flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border ${
                   isActive
                     ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
@@ -48,7 +50,7 @@ export default function Sidebar() {
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : ''}`} />
-                {t(labelKey)}
+                <span className="sidebar-label">{t(labelKey)}</span>
               </NavLink>
             );
           })}
@@ -56,17 +58,18 @@ export default function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/5">
+      <div className="sidebar-footer p-4 border-t border-white/5">
         <a
           href="https://github.com/moria5161/RamancloudV2"
           target="_blank"
           rel="noopener noreferrer"
+          title="GitHub" aria-label="GitHub"
           className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
         >
           <Github className="w-3.5 h-3.5" />
-          <span>GitHub</span>
+          <span className="sidebar-label">GitHub</span>
         </a>
-        <p className="text-[10px] text-gray-600 mt-2">
+        <p className="sidebar-label text-[10px] text-gray-600 mt-2">
           Ren Research Group, XMU
         </p>
       </div>

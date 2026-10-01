@@ -1,6 +1,27 @@
 import React, { useState } from 'react';
 import { GripVertical, Scissors, Waves, Baseline, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableStep({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : undefined, opacity: isDragging ? 0.8 : 1 }}>
+      {children({ attributes, listeners })}
+    </div>
+  );
+}
+
+function stepSummary(step, t) {
+  if (step.type === 'cut') return `${step.params.start} - ${step.params.end} cm⁻¹`;
+  if (step.method === 'sg') return `SG · ${t('window')} ${step.params.window_size} · ${t('order')} ${step.params.order}`;
+  if (step.method === 'wtd') return `WTD · ${step.params.wavelet || 'db3'} · ${t('level')} ${step.params.level || 3}`;
+  if (step.method === 'skip') return t('skip');
+  const labels = { lam: 'lambda', diff_order: 'diffOrder', poly_order: 'polyOrder', loops: 'loops', half_k_threshold: 'peakSeek', half_window: 'halfWindow' };
+  return `${step.method} · ${Object.entries(step.params).map(([key, value]) => `${t(labels[key] || key)} ${typeof value === 'number' && value >= 10000 ? value.toExponential(0) : value}`).join(' · ')}`;
+}
 
 const STEP_TYPES = {
   cut: { icon: Scissors, labelKey: 'cut', color: 'from-emerald-500 to-teal-600' },
@@ -27,10 +48,14 @@ const BASELINE_OPTIONS = [
 export default function StepController({ steps, onChange, defaultCutRange }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const { t } = usePreferences();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const addStep = (type) => {
     const newStep = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       type,
       method: type === 'cut' ? 'cut' : type === 'denoise' ? 'sg' : 'airpls',
       params: type === 'cut'
@@ -47,7 +72,13 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
   };
 
   const updateStep = (id, updates) => {
-    onChange(steps.map(s => s.id === id ? { ...s, ...updates } : s));
+    const defaults = {
+      sg: { window_size: 7, order: 3 }, wtd: { wavelet: 'db3', level: 3 },
+      peer: { loops: 3, half_k_threshold: 2 }, airpls: { lam: 1e7, diff_order: 3 },
+      aabs: { lam: 1e7, diff_order: 2, Ln: 6, Lb: 140 },
+      imodpoly: { poly_order: 3 }, airpls_old: { poly_order: 3 }, snip: { half_window: 40 }, skip: {},
+    };
+    onChange(steps.map(s => s.id === id ? { ...s, ...(updates.method ? { params: defaults[updates.method] || {} } : {}), ...updates } : s));
   };
 
   const moveStep = (index, direction) => {
@@ -68,6 +99,10 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
       </div>
 
       {/* Step list */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
+        if (over && active.id !== over.id) onChange(arrayMove(steps, steps.findIndex(s => s.id === active.id), steps.findIndex(s => s.id === over.id)));
+      }}>
+      <SortableContext items={steps.map(step => step.id)} strategy={verticalListSortingStrategy}>
       <div className="space-y-2">
         {steps.map((step, index) => {
           const typeInfo = STEP_TYPES[step.type];
@@ -75,13 +110,18 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
           const isExpanded = expandedStep === step.id;
 
           return (
-            <div key={step.id} className={`glass rounded-xl overflow-hidden border ${isExpanded ? 'border-indigo-500/30' : 'border-white/5'} transition-all duration-200`}>
+            <SortableStep key={step.id} id={step.id}>{({ attributes, listeners }) => (
+            <div className={`glass rounded-lg overflow-hidden border ${isExpanded ? 'border-indigo-500/30' : 'border-white/5'} transition-all duration-200`}>
               {/* Step header */}
               <div
                 className="flex items-center gap-2 p-3 cursor-pointer hover:bg-white/5"
                 onClick={() => setExpandedStep(isExpanded ? null : step.id)}
+                role="button" tabIndex={0} aria-expanded={isExpanded}
+                onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setExpandedStep(isExpanded ? null : step.id); } }}
               >
-                <GripVertical className="w-3.5 h-3.5 text-gray-600 cursor-grab" />
+                <button {...attributes} {...listeners} title={t('reorderStep')} aria-label={t('reorderStep')} onClick={event => event.stopPropagation()} className="cursor-grab touch-none p-1 shrink-0">
+                  <GripVertical className="w-3.5 h-3.5 text-gray-600" />
+                </button>
                 <span className="text-xs font-mono text-gray-500 w-5">{index + 1}</span>
                 <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${typeInfo.color} flex items-center justify-center`}>
                   <Icon className="w-3.5 h-3.5 text-white" />
@@ -94,23 +134,24 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                 )}
                 <div className="flex items-center gap-1 ml-auto">
                   {index > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); moveStep(index, -1); }}
+                    <button title={t('moveUp')} aria-label={t('moveUp')} onClick={(e) => { e.stopPropagation(); moveStep(index, -1); }}
                       className="p-1 hover:bg-white/10 rounded transition-colors">
                       <ChevronUp className="w-3 h-3 text-gray-400" />
                     </button>
                   )}
                   {index < steps.length - 1 && (
-                    <button onClick={(e) => { e.stopPropagation(); moveStep(index, 1); }}
+                    <button title={t('moveDown')} aria-label={t('moveDown')} onClick={(e) => { e.stopPropagation(); moveStep(index, 1); }}
                       className="p-1 hover:bg-white/10 rounded transition-colors">
                       <ChevronDown className="w-3 h-3 text-gray-400" />
                     </button>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}
+                  <button title={t('removeStep')} aria-label={t('removeStep')} onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}
                     className="p-1 hover:bg-red-500/20 rounded transition-colors">
                     <X className="w-3 h-3 text-gray-500 hover:text-red-400" />
                   </button>
                 </div>
               </div>
+              {!isExpanded && <p className="step-summary px-3 pb-3 text-xs text-gray-500">{stepSummary(step, t)}</p>}
 
               {/* Step params */}
               {isExpanded && (
@@ -266,6 +307,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                 </div>
               )}
             </div>
+            )}</SortableStep>
           );
         })}
 
@@ -275,6 +317,8 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
           </div>
         )}
       </div>
+      </SortableContext>
+      </DndContext>
 
       {/* Add step buttons */}
       <div className="flex gap-2">
