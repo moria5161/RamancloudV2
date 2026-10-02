@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Activity, Layers, BookOpen } from 'lucide-react';
+import { Sparkles, ArrowRight, Activity, Layers, Wrench, BookOpen } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import RecentResearch from '../components/RecentResearch';
 import Feedback from '../components/Feedback';
@@ -37,7 +37,7 @@ export default function HomePage() {
         {/* Processing modules */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-200">{t('processingModules')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link to="/spectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -65,6 +65,21 @@ export default function HomePage() {
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">
                 {t('hyperspectralDesc')}
+              </p>
+            </Link>
+
+            <Link to="/extra-tools" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <Wrench className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-200">{t('extraTools')}</h3>
+                  <p className="text-[10px] text-gray-500">{t('fileUtilities')}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {t('extraToolsDesc')}
               </p>
             </Link>
           </div>
