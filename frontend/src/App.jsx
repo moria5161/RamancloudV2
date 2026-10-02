@@ -9,6 +9,7 @@ import HyperspectralProcessing from './pages/HyperspectralProcessing';
 import ExtraTools from './pages/ExtraTools';
 import Tutorial from './pages/Tutorial';
 import Contributors from './pages/Contributors';
+import useVisitTracking from './hooks/useVisitTracking';
 
 function WelcomeScreen() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -32,6 +33,7 @@ function WelcomeScreen() {
 
 function AppShell() {
   const location = useLocation();
+  useVisitTracking(location.pathname);
   const [visitedWorkspaces, setVisitedWorkspaces] = useState([]);
 
   useEffect(() => {

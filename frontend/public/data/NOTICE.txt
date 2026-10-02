@@ -1,0 +1,8 @@
+world-countries.json is derived from Natural Earth 1:50m admin-0 countries.
+Source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson
+Natural Earth map data is in the public domain:
+https://www.naturalearthdata.com/about/terms-of-use/
+
+Geometry coordinates are rounded to 0.001 degrees for display. LABEL_X/LABEL_Y
+are representative map-label locations, not visitor coordinates. Region counts
+come from RamanCloud statistics and are not supplied by Natural Earth.

@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+.visitor-globe-section { border-top: 1px solid var(--rc-hairline); padding-top: 24px; }
+.visitor-globe-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; align-items: center; gap: 28px; margin: 12px 0 20px; }
+.visitor-globe-stage { position: relative; min-width: 0; height: 430px; }
+.visitor-globe-canvas { width: 100%; height: 100%; }
+.visitor-globe-placeholder { height: 100%; display: grid; place-items: center; color: var(--rc-secondary); font-size: 13px; text-align: center; padding: 24px; }
+.visitor-globe-tools { position: absolute; top: 8px; right: 0; display: flex; gap: 4px; }
+.visitor-globe-tool { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--rc-secondary); background: var(--rc-surface); }
+.visitor-globe-tool:hover { background: var(--rc-elevated); color: var(--rc-blue); }
+.visitor-globe-tool:disabled { opacity: .4; }
+.visitor-globe-selection { position: absolute; bottom: 0; left: 0; width: 100%; text-align: center; color: var(--rc-secondary); font-size: 12px; pointer-events: none; }
+.visitor-globe-region-list { max-height: 300px; overflow-y: auto; }
+.visitor-globe-region { width: 100%; display: block; text-align: left; padding: 10px 4px; border-radius: 4px; }
+.visitor-globe-region:hover, .visitor-globe-region[aria-pressed="true"] { background: var(--rc-surface); }
+.visitor-globe-region-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--rc-secondary); }
+.visitor-globe-region-label > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.visitor-globe-region-track { display: block; height: 3px; margin-top: 6px; background: var(--rc-hairline); }
+.visitor-globe-region-track > span { display: block; height: 100%; }
+@media (max-width: 760px) {
+  .visitor-globe-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .visitor-globe-stage { height: 340px; }
+  .visitor-globe-section .segmented-control { flex-wrap: wrap; max-width: 100%; }
+  .visitor-globe-section .segmented-control button { min-width: 0; white-space: normal; }
+  .visitor-globe-region-list { max-height: 210px; }
+}
+
 html, body, #root {
   min-height: 100vh;
   margin: 0;

@@ -1,0 +1,15 @@
+{
+  "source": "Owner-recorded MapMyVisitors snapshot (May 2026)",
+  "pageviews": 7470,
+  "since": "2023-12-11",
+  "snapshot_date": null,
+  "snapshot_month": "2026-05",
+  "country_period": null,
+  "country_counts_partial": true,
+  "countries": {
+    "CN": 796, "US": 121, "HK": 19, "KR": 17, "TW": 11,
+    "SG": 10, "MO": 9, "TH": 8, "FR": 8, "RU": 7,
+    "AU": 7, "JP": 6, "PL": 5, "NZ": 5, "MM": 4,
+    "IR": 4, "CA": 4, "SI": 3, "GB": 3, "DE": 3
+  }
+}

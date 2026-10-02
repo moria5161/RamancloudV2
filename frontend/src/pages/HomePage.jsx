@@ -4,6 +4,7 @@ import { Sparkles, ArrowRight, Microscope, TrendingUp, BookOpen } from 'lucide-r
 import { usePreferences } from '../i18n';
 import RecentResearch from '../components/RecentResearch';
 import Feedback from '../components/Feedback';
+import VisitStatistics from '../components/VisitStatistics';
 
 export default function HomePage() {
   const { t } = usePreferences();
@@ -71,6 +72,8 @@ export default function HomePage() {
         </div>
 
         <RecentResearch />
+
+        <VisitStatistics />
 
         <Feedback />
       </div>
