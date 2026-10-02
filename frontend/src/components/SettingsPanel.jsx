@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, Languages, Moon, Settings, Sun } from 'lucide-react';
 import { usePreferences } from '../i18n';
 
 export default function SettingsPanel() {
   const [open, setOpen] = useState(false);
   const { language, setLanguage, theme, setTheme, t } = usePreferences();
+  const dockRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = event => {
+      if (!dockRef.current?.contains(event.target)) setOpen(false);
+    };
+    const dismissOnEscape = event => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', dismissOutside, true);
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside, true);
+      document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [open]);
 
   return (
-    <div className="settings-dock">
+    <div ref={dockRef} className="settings-dock">
       {open && (
-        <div className="settings-popover glass rounded-xl border border-white/5 p-4">
+        <div id="settings-popover" className="settings-popover glass rounded-xl border border-white/5 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-200 mb-4">
             <Settings className="w-4 h-4 text-indigo-400" />
             {t('settings')}
@@ -52,7 +73,7 @@ export default function SettingsPanel() {
           </div>
         </div>
       )}
-      <button className="settings-trigger glass" onClick={() => setOpen((value) => !value)} aria-label={t('settings')}>
+      <button ref={triggerRef} className="settings-trigger glass" onClick={() => setOpen((value) => !value)} aria-label={t('settings')} aria-expanded={open} aria-controls="settings-popover">
         <Settings className="w-4 h-4" />
       </button>
     </div>
