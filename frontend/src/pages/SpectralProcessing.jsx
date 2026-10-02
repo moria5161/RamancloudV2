@@ -28,6 +28,8 @@ export default function SpectralProcessing() {
   const task = useWorkspaceTask(t);
   const [runRecord, setRunRecord] = useState(null);
   const [includeRecord, setIncludeRecord] = useState(true);
+  const [uploadedSpectra, setUploadedSpectra] = useState([]);
+  const [selectedSpectrum, setSelectedSpectrum] = useState(0);
   const isStale = !!runRecord && pipelineSignature(steps) !== JSON.stringify(runRecord.steps);
 
   const applyData = (data, source, demo = '') => {
@@ -48,6 +50,8 @@ export default function SpectralProcessing() {
     task.run('readingData', async () => {
       const { data: res } = await axios.get(`${API_BASE}/api/demo/${name}`);
       if (res.code !== 0) throw new Error(res.msg);
+      setUploadedSpectra([]);
+      setSelectedSpectrum(0);
       applyData(res.data, null, name);
     });
   };
@@ -63,6 +67,8 @@ export default function SpectralProcessing() {
       const { data: res } = await axios.post(`${API_BASE}/api/upload`, formData, { onUploadProgress: uploadProgress });
       if (res.code !== 0 || !res.data.spectra.length) throw new Error(res.msg || 'Upload failed');
       const spec = res.data.spectra[0];
+      setUploadedSpectra(res.data.spectra);
+      setSelectedSpectrum(0);
       applyData(spec, spec.filename);
     });
   };
@@ -113,6 +119,8 @@ export default function SpectralProcessing() {
     setCutRange(null);
     setError(null);
     task.setError(null);
+    setUploadedSpectra([]);
+    setSelectedSpectrum(0);
   };
 
   const handleStepsChange = nextSteps => {
@@ -211,6 +219,14 @@ export default function SpectralProcessing() {
           elapsed={runRecord?.elapsed_seconds} includeRecord={includeRecord}
           onIncludeRecordChange={setIncludeRecord} onClear={handleClear}
           onDemoChange={loadDemo} demos={DEMOS}
+          uploadedSpectra={uploadedSpectra} selectedSpectrum={selectedSpectrum}
+          onSpectrumChange={index => {
+            if (task.busy || !uploadedSpectra[index]) return;
+            setSelectedSpectrum(index);
+            task.setError(null);
+            setError(null);
+            applyData(uploadedSpectra[index], uploadedSpectra[index].filename);
+          }}
           cutRange={cutRange} onCutRangeChange={handleCutRangeChange}
         />
       </ControlDock>

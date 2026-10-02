@@ -24,6 +24,9 @@ export default function ControlPanel({
   includeRecord,
   onIncludeRecordChange,
   onClear,
+  uploadedSpectra = [],
+  selectedSpectrum = 0,
+  onSpectrumChange,
 }) {
   const { t } = usePreferences();
 
@@ -52,6 +55,16 @@ export default function ControlPanel({
           </select>
           {fileName && (
             <p className="text-[10px] text-gray-500 truncate">{t('file')}: {fileName}</p>
+          )}
+          {uploadedSpectra.length > 1 && (
+            <div>
+              <label htmlFor="uploaded-spectrum" className="text-[10px] text-gray-500">{t('uploadedSpectrum')}</label>
+              <select id="uploaded-spectrum" disabled={busy} value={selectedSpectrum}
+                onChange={e => onSpectrumChange(Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 text-xs bg-black/30 border border-white/10 rounded-lg text-gray-200">
+                {uploadedSpectra.map((spectrum, index) => <option key={index} value={index}>{spectrum.filename}</option>)}
+              </select>
+            </div>
           )}
         </div>
 

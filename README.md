@@ -9,6 +9,7 @@ An online workspace for Raman spectral preprocessing.
 - Process individual spectra, time series, and hyperspectral images.
 - Arrange spectral cutting, denoising, and baseline correction in your preferred order.
 - Compare raw and processed data through spectra and heatmaps, and inspect individual spatial pixels or time points.
+- Switch between uploaded spectra and inspect time-series changes in a difference heatmap.
 - Download processed data with optional processing records, split or merge spectral files, and convert between supported instrument formats.
 - Switch between English and Chinese, with light and dark themes.
 
@@ -20,6 +21,8 @@ An online workspace for Raman spectral preprocessing.
 4. Run the pipeline, compare the results, and download the processed data.
 
 Use **Extra Tools** for file operations and **Tutorial** for guidance.
+
+Time-series and imaging downloads use Horiba-style tab-separated files with source coordinates preserved. Select **Horiba** when importing these results again.
 
 To run your own copy, see the [local setup guide](LOCAL_SETUP.md).
 
