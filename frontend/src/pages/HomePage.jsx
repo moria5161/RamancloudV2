@@ -2,12 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, Microscope, Cpu, Zap, TrendingUp, BookOpen, Github, Mail } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import RecentResearch from '../components/RecentResearch';
 
 export default function HomePage() {
   const { t } = usePreferences();
   return (
     <div className="home-page h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-8 py-12 space-y-12 animate-fade-in">
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-12 space-y-12 animate-fade-in">
         {/* Hero */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
@@ -20,7 +21,7 @@ export default function HomePage() {
           <p className="text-lg text-gray-400 max-w-xl mx-auto">
             {t('heroSubtitle')}
           </p>
-          <div className="flex gap-3 justify-center pt-2">
+          <div className="flex flex-wrap gap-3 justify-center pt-2">
             <Link to="/spectral" className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium hover:from-indigo-500 hover:to-purple-500 transition-all shadow-lg shadow-indigo-500/20">
               {t('getStarted')}
               <ArrowRight className="w-4 h-4" />
@@ -33,7 +34,7 @@ export default function HomePage() {
         </div>
 
         {/* Feature cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { icon: Cpu, title: t('smartPipeline'), desc: t('smartPipelineDesc'), color: 'indigo' },
             { icon: TrendingUp, title: t('realTimeViz'), desc: t('realTimeVizDesc'), color: 'emerald' },
@@ -52,7 +53,7 @@ export default function HomePage() {
         {/* Processing modules */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-200">{t('processingModules')}</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Link to="/spectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -85,9 +86,11 @@ export default function HomePage() {
           </div>
         </div>
 
+        <RecentResearch />
+
         {/* Footer */}
         <div className="border-t border-white/5 pt-8 pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-xs text-gray-600">
               {t('developedBy')} <a href="https://bren.xmu.edu.cn" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">Ren Research Group</a>, Xiamen University
             </div>
