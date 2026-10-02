@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import Plot from 'react-plotly.js';
 import { Crosshair } from 'lucide-react';
-import { sharedHeatmapBounds, selectionShapes } from './chartHelpers';
+import { sharedHeatmapBounds, selectionShapes, imagingDisplay, imagingPixel } from './chartHelpers';
 import useChartLayout from '../hooks/useChartLayout';
 import { usePreferences } from '../i18n';
 
@@ -33,7 +33,7 @@ const equalPixelYAxis = {
 // ============================================================
 // Imaging Heatmap
 // ============================================================
-export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN, onHeatmapClick, title, height, colorscale, selectedPixel, coordinates, previewScale = 1 }) {
+export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN, onHeatmapClick, title, height, colorscale, selectedPixel, coordinates, previewScale = 1, transpose = false }) {
   const layout = useChartLayout(darkLayout, wavenumber);
   const { t } = usePreferences();
   // Find closest wavenumber index
@@ -62,8 +62,7 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
   const bounds = useMemo(() => sharedHeatmapBounds([heatmapZ]), [heatmapZ]);
   const traces = [{
     ...bounds,
-    z: heatmapZ,
-    customdata: heatmapZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])),
+    ...imagingDisplay(heatmapZ, coordinates, previewScale, transpose),
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
     colorbar: { title: t('intensity'), titleside: 'right', thickness: 12, len: 0.6 },
@@ -99,9 +98,9 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
           ...layout,
           height: height || 500,
           title: title || t('imaging'),
-          shapes: selectionShapes({ pixel: selectedPixel }),
-          xaxis: { ...equalPixelXAxis, title: t('pixelX') },
-          yaxis: { ...equalPixelYAxis, title: t('pixelY') },
+          shapes: selectionShapes({ pixel: imagingPixel(selectedPixel, transpose) }),
+          xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX') },
+          yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY') },
         }}
         config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
         onClick={onHeatmapClick}
@@ -316,7 +315,7 @@ export function PixelSpectrum({ previewData, wavenumber, pixelX, pixelY, rawSpec
 // ============================================================
 // Compare Imaging (Raw vs Processed side by side)
 // ============================================================
-export function CompareImaging({ rawPreview, processedPreview, wavenumber, selectedWN, onSelectWN, onHeatmapClick, height, selectedPixel, sharedColorScale = true, coordinates, previewScale = 1 }) {
+export function CompareImaging({ rawPreview, processedPreview, wavenumber, selectedWN, onSelectWN, onHeatmapClick, height, selectedPixel, sharedColorScale = true, coordinates, previewScale = 1, transpose = false }) {
   const layout = useChartLayout(darkLayout, wavenumber);
   const { t } = usePreferences();
   const wnIdx = useMemo(() => {
@@ -348,12 +347,10 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
     }
     return [sharedHeatmapBounds([rawZ]), sharedHeatmapBounds([procZ])];
   }, [rawZ, procZ, sharedColorScale]);
-  const sourceCoordinates = useMemo(() => rawZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])), [rawZ, coordinates, previewScale]);
   const traces = [
     {
       ...rawBounds,
-      z: rawZ, type: 'heatmap', colorscale: 'Jet',
-      customdata: sourceCoordinates,
+      ...imagingDisplay(rawZ, coordinates, previewScale, transpose), type: 'heatmap', colorscale: 'Jet',
       colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: 0.4, y: 0.79 },
       name: t('raw'), xaxis: 'x', yaxis: 'y',
       hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('raw')}: %{z:.2f}<extra></extra>`,
@@ -363,8 +360,7 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
   if (procZ) {
     traces.push({
       ...processedBounds,
-      z: procZ, type: 'heatmap', colorscale: 'Jet',
-      customdata: sourceCoordinates,
+      ...imagingDisplay(procZ, coordinates, previewScale, transpose), type: 'heatmap', colorscale: 'Jet',
       colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
       name: t('processed'), xaxis: 'x2', yaxis: 'y2',
       hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('processed')}: %{z:.2f}<extra></extra>`,
@@ -392,15 +388,15 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
           height: height || 600,
         margin: { l: 55, r: 95, t: 40, b: 55 },
           title: procZ ? t('rawProcessedComparison') : t('imaging'),
-          shapes: selectionShapes({ pixel: selectedPixel, compare: !!procZ }),
+          shapes: selectionShapes({ pixel: imagingPixel(selectedPixel, transpose), compare: !!procZ }),
           ...(procZ ? {
-            xaxis: { ...equalPixelXAxis, title: t('pixelX'), domain: [0, 1], anchor: 'y' },
-            yaxis: { ...equalPixelYAxis, title: t('pixelY'), domain: [0.58, 1], anchor: 'x' },
-            xaxis2: { ...equalPixelXAxis, title: t('pixelX'), domain: [0, 1], anchor: 'y2', matches: 'x' },
-            yaxis2: { ...equalPixelYAxis, title: t('pixelY'), scaleanchor: 'x2', domain: [0, 0.42], anchor: 'x2', matches: 'y' },
+            xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX'), domain: [0, 1], anchor: 'y' },
+            yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY'), domain: [0.58, 1], anchor: 'x' },
+            xaxis2: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX'), domain: [0, 1], anchor: 'y2', matches: 'x' },
+            yaxis2: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY'), scaleanchor: 'x2', domain: [0, 0.42], anchor: 'x2', matches: 'y' },
           } : {
-            xaxis: { ...equalPixelXAxis, title: t('pixelX') },
-            yaxis: { ...equalPixelYAxis, title: t('pixelY') },
+            xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX') },
+            yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY') },
           }),
         }}
         config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}

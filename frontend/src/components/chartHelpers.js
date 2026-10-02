@@ -30,6 +30,19 @@ export function sharedHeatmapBounds(matrices) {
   return { zmin, zmax, zauto: false };
 }
 
+export function imagingPixel(pixel, transpose = false) {
+  return pixel && transpose ? { x: pixel.y, y: pixel.x } : pixel;
+}
+
+export function imagingDisplay(matrix, coordinates, scale = 1, transpose = false) {
+  const z = transpose ? (matrix[0] || []).map((_, x) => matrix.map(row => row[x])) : matrix;
+  const customdata = z.map((row, y) => row.map((_, x) => {
+    const source = imagingPixel({ x: x * scale, y: y * scale }, transpose);
+    return [coordinates?.x?.[source.x] ?? source.x, coordinates?.y?.[source.y] ?? source.y];
+  }));
+  return { z, customdata };
+}
+
 export function selectionShapes({ pixel, index, compare }) {
   if (!pixel && index == null) return [];
   return (compare ? ['', '2'] : ['']).map(suffix => pixel ? {

@@ -9,6 +9,7 @@ import { usePreferences } from '../i18n';
 import useWorkspaceTask from '../hooks/useWorkspaceTask';
 import WorkspaceFeedback from '../components/WorkspaceFeedback';
 import { createProcessingRecord, exportResult, pipelineSignature } from '../utils/processingRecord';
+import { imagingPixel } from '../components/chartHelpers';
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -60,6 +61,7 @@ export default function HyperspectralProcessing() {
   const hasData = rawData !== null;
   const isImaging = mode === 'imaging';
   const isTimeSeries = mode === 'time_series';
+  const transposeImaging = isImaging && rawData?.instrument === 'Horiba';
 
   const showError = msg => setError(msg);
 
@@ -73,9 +75,9 @@ export default function HyperspectralProcessing() {
     clearTimeout(sliceTimerRef.current);
   };
 
-  const applyData = (data, demo = '') => {
+  const applyData = (data, demo = '', instrument = 'Horiba') => {
     clearSelections();
-    setRawData(data);
+    setRawData({ ...data, instrument });
     setMode(data.mode);
     setFileName(data.filename);
     setDemoName(demo);
@@ -111,7 +113,7 @@ export default function HyperspectralProcessing() {
       formData.append('mode', uploadMode);
       const { data: res } = await axios.post(`${API_BASE}/api/upload-hyperspectral`, formData, { onUploadProgress: uploadProgress });
       if (res.code !== 0) throw new Error(res.msg);
-      applyData(res.data);
+      applyData(res.data, '', uploadInstrument);
     });
   };
 
@@ -161,7 +163,7 @@ export default function HyperspectralProcessing() {
         format: 'mapping',
       }, { responseType: 'blob' });
       await exportResult(data, filename, {
-        ...runRecord, instrument: demoName ? 'Horiba' : uploadInstrument,
+        ...runRecord, instrument: rawData.instrument,
         coordinates: rawData.coordinates,
         export_instrument: 'Horiba',
         data_format: mode === 'imaging' ? 'Horiba tab-separated mapping: first row has two empty cells followed by wavenumbers; subsequent rows contain X, Y, intensities.' : 'Horiba tab-separated time series: first row has one empty cell followed by wavenumbers; subsequent rows contain original time/index and intensities.',
@@ -207,9 +209,9 @@ export default function HyperspectralProcessing() {
       return;
     }
     const scale = rawData?.preview_scale || 1;
-    setSelectedPixel({ x: Math.round(pt.x * scale), y: Math.round(pt.y * scale) });
+    setSelectedPixel(imagingPixel({ x: Math.round(pt.x * scale), y: Math.round(pt.y * scale) }, transposeImaging));
     setActiveTab('pixel');
-  }, [rawData?.preview_scale, rawData?.coordinates, isTimeSeries]);
+  }, [rawData?.preview_scale, rawData?.coordinates, isTimeSeries, transposeImaging]);
 
   const fetchSlice = useCallback(async (datasetId, value) => {
     if (!datasetId || value == null) return null;
@@ -401,6 +403,7 @@ export default function HyperspectralProcessing() {
                 {activeTab === 'imaging' && isImaging && rawData.preview && (
                   processedData?.preview ? (
                     <CompareImaging
+                      transpose={transposeImaging}
                       rawPreview={rawData.preview}
                       processedPreview={processedData.preview}
                       coordinates={rawData.coordinates}
@@ -416,6 +419,7 @@ export default function HyperspectralProcessing() {
                     />
                   ) : (
                     <ImagingHeatmap
+                      transpose={transposeImaging}
                       previewData={rawData.preview}
                       coordinates={rawData.coordinates}
                       previewScale={rawData.preview_scale || 1}
