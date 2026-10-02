@@ -10,9 +10,28 @@ import ExtraTools from './pages/ExtraTools';
 import Tutorial from './pages/Tutorial';
 import Contributors from './pages/Contributors';
 
+function WelcomeScreen() {
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    const reveal = setTimeout(() => setShowWelcome(false), 1950);
+    const finish = setTimeout(() => setFinished(true), 2500);
+    return () => { clearTimeout(reveal); clearTimeout(finish); };
+  }, []);
+
+  if (finished) return null;
+  return <div className={`welcome-screen ${showWelcome ? 'is-visible' : 'is-hidden'}`}>
+    <div className="welcome-title" aria-label="Welcome to Ramancloud">
+      <span className="welcome-word" aria-hidden="true">Welcome</span>{' '}
+      <span className="welcome-word" aria-hidden="true">to</span>{' '}
+      <span className="welcome-word" aria-hidden="true">Ramancloud</span>
+    </div>
+  </div>;
+}
+
 function AppShell() {
   const location = useLocation();
-  const [showWelcome, setShowWelcome] = useState(true);
   const [visitedWorkspaces, setVisitedWorkspaces] = useState([]);
 
   useEffect(() => {
@@ -24,20 +43,8 @@ function AppShell() {
     return () => cancelAnimationFrame(frame);
   }, [location.pathname]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowWelcome(false), 1950);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="app-liquid-bg flex h-screen overflow-hidden">
-      <div className={`welcome-screen ${showWelcome ? 'is-visible' : 'is-hidden'}`}>
-        <div className="welcome-title" aria-label="Welcome to Ramancloud">
-          <span className="welcome-word" aria-hidden="true">Welcome</span>{' '}
-          <span className="welcome-word" aria-hidden="true">to</span>{' '}
-          <span className="welcome-word" aria-hidden="true">Ramancloud</span>
-        </div>
-      </div>
       <Sidebar />
       <main className="flex-1 overflow-hidden">
         {[
@@ -70,6 +77,7 @@ function App() {
   return (
     <Router basename="/preprocessing">
       <PreferencesProvider>
+        <WelcomeScreen />
         <AppShell />
       </PreferencesProvider>
     </Router>

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Microscope, Cpu, Zap, TrendingUp, BookOpen, Github, Mail } from 'lucide-react';
+import { Sparkles, ArrowRight, Microscope, TrendingUp, BookOpen } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import RecentResearch from '../components/RecentResearch';
+import Feedback from '../components/Feedback';
 
 export default function HomePage() {
   const { t } = usePreferences();
@@ -31,23 +32,6 @@ export default function HomePage() {
               {t('tutorial')}
             </Link>
           </div>
-        </div>
-
-        {/* Feature cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { icon: Cpu, title: t('smartPipeline'), desc: t('smartPipelineDesc'), color: 'indigo' },
-            { icon: TrendingUp, title: t('realTimeViz'), desc: t('realTimeVizDesc'), color: 'emerald' },
-            { icon: Zap, title: t('algorithms'), desc: t('algorithmsDesc'), color: 'amber' },
-          ].map(({ icon: Icon, title, desc, color }) => (
-            <div key={title} className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-white/10 transition-all">
-              <div className={`w-10 h-10 rounded-xl liquid-icon liquid-icon-${color} flex items-center justify-center mb-3`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-semibold text-gray-200 mb-1.5">{title}</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-            </div>
-          ))}
         </div>
 
         {/* Processing modules */}
@@ -88,22 +72,7 @@ export default function HomePage() {
 
         <RecentResearch />
 
-        {/* Footer */}
-        <div className="border-t border-white/5 pt-8 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-gray-600">
-              {t('developedBy')} <a href="https://bren.xmu.edu.cn" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">Ren Research Group</a>, Xiamen University
-            </div>
-            <div className="flex items-center gap-4">
-              <a href="mailto:xinyulu@stu.xmu.edu.cn" className="text-gray-600 hover:text-gray-400 transition-colors">
-                <Mail className="w-4 h-4" />
-              </a>
-              <a href="https://github.com/moria5161/RamancloudV2" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-400 transition-colors">
-                <Github className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-        </div>
+        <Feedback />
       </div>
     </div>
   );

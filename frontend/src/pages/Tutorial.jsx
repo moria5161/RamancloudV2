@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookOpen, Scissors, Waves, Baseline, ArrowRight, FileText, Download } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import AlgorithmReferences from '../components/AlgorithmReferences';
 
 const Section = ({ id, title, children }) => (
   <section id={id} className="space-y-2">
@@ -15,7 +16,7 @@ export default function Tutorial() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-8 py-10 space-y-8 animate-fade-in">
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-8 animate-fade-in">
         {/* Header */}
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -36,7 +37,7 @@ export default function Tutorial() {
               ? 'RamanCloud 是面向拉曼光谱数据预处理的网页平台。你可以上传自己的 .txt 文件，也可以使用内置示例数据体验平台功能。'
               : 'RamanCloud is a web-based platform for Raman spectral data preprocessing. You can upload your own .txt files or use built-in demo datasets (Bacteria, Ultra-Low Frequency Raman) to explore the platform.'}
           </p>
-          <div className="flex gap-4 text-xs">
+          <div className="flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-1.5 text-indigo-400">
               <FileText className="w-3 h-3" /> {isZh ? '支持格式：.txt、.asc、.csv' : 'Supported: .txt, .asc, .csv'}
             </div>
@@ -137,13 +138,14 @@ export default function Tutorial() {
           <p className="text-sm text-gray-400">
             {isZh
               ? '你可以自由控制处理顺序。向流程中添加步骤，并使用上下箭头调整顺序。系统会按照显示顺序执行，也可以多次添加同类步骤。'
-              : 'You control the order of operations. Add steps to the pipeline and reorder them using the up/down arrows. Operations execute in the order shown. You can add multiple steps of the same type (e.g., multiple denoising passes).'}
+              : 'You control the order of operations. Add steps to the pipeline and reorder them using the up/down arrows. Operations execute in the order shown.'}
           </p>
           <div className="flex items-center gap-2 text-xs text-indigo-400">
             <ArrowRight className="w-3 h-3" />
             {isZh ? '示例：Cut -> Denoise -> Baseline，或 Denoise -> Cut -> Baseline，由你决定。' : 'Example: Cut -> Denoise -> Baseline, or Denoise -> Cut -> Baseline - you decide!'}
           </div>
         </div>
+        <AlgorithmReferences />
       </div>
     </div>
   );
