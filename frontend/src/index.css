@@ -17,6 +17,10 @@
 .visitor-globe-region-label > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .visitor-globe-region-track { display: block; height: 3px; margin-top: 6px; background: var(--rc-hairline); }
 .visitor-globe-region-track > span { display: block; height: 100%; }
+.visitor-globe-section.is-compact { border-top: 0; padding-top: 20px; }
+.visitor-globe-section.is-compact .visitor-globe-layout { grid-template-columns: minmax(0, 1fr) 220px; gap: 20px; margin-bottom: 4px; }
+.visitor-globe-section.is-compact .visitor-globe-stage { height: 340px; }
+.visitor-globe-section.is-compact .visitor-globe-region-list { max-height: 230px; }
 @media (max-width: 760px) {
   .visitor-globe-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .visitor-globe-stage { height: 340px; }

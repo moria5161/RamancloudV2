@@ -4,7 +4,6 @@ import { Sparkles, ArrowRight, Activity, Layers, BookOpen } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import RecentResearch from '../components/RecentResearch';
 import Feedback from '../components/Feedback';
-import VisitStatistics from '../components/VisitStatistics';
 
 export default function HomePage() {
   const { t } = usePreferences();
@@ -72,8 +71,6 @@ export default function HomePage() {
         </div>
 
         <RecentResearch />
-
-        <VisitStatistics />
 
         <Feedback />
       </div>
