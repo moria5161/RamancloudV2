@@ -1,17 +1,33 @@
 export function sharedHeatmapBounds(matrices) {
-  let min = Infinity;
-  let max = -Infinity;
+  const values = [];
   for (const matrix of matrices) {
     for (const row of matrix || []) {
       for (const value of row || []) {
         if (typeof value === 'number' && Number.isFinite(value)) {
-          min = Math.min(min, value);
-          max = Math.max(max, value);
+          values.push(value);
         }
       }
     }
   }
-  return min === Infinity ? {} : { zmin: min, zmax: max === min ? min + 1 : max, zauto: false };
+  if (!values.length) return {};
+  // Sort a private numeric copy; display bounds never alter source intensities.
+  const sorted = new Float64Array(values).sort();
+  const percentile = fraction => {
+    const index = (sorted.length - 1) * fraction;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    if (sorted[lower] === sorted[upper]) return sorted[lower];
+    const weight = index - lower;
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  };
+  let zmin = percentile(0.01);
+  let zmax = percentile(0.99);
+  if (zmin === zmax) {
+    const padding = Math.max(1, Math.abs(zmin) * Number.EPSILON);
+    if (Number.isFinite(zmax + padding)) zmax += padding;
+    else zmin -= padding;
+  }
+  return { zmin, zmax, zauto: false };
 }
 
 export function selectionShapes({ pixel, index, compare }) {
