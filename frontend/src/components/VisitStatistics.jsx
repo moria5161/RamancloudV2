@@ -29,6 +29,7 @@ export default function VisitStatistics() {
   }, []);
 
   const number = value => new Intl.NumberFormat(language).format(value);
+  const knownRegions = data?.countries.filter(item => item.code !== 'ZZ' && item.count > 0).length || 0;
 
   return (
     <section className="glass rounded-xl border border-white/5 p-4 sm:p-5" aria-labelledby="visit-statistics-heading">
@@ -47,11 +48,10 @@ export default function VisitStatistics() {
       {!data && busy && <p role="status" className="py-8 text-center text-sm text-gray-500">{t('loadingStatistics')}</p>}
       {data && (
         <>
-          <dl className="mt-5 grid grid-cols-3 gap-3 border-y border-white/10 py-4">
+          <dl className="mt-5 grid grid-cols-2 gap-3 border-y border-white/10 py-4">
             {[
               [t('totalPageviews'), data.total.pageviews],
-              [t('newPageviews'), data.recorded.pageviews],
-              [t('newAnonymousSessions'), data.total.sessions],
+              [isZh ? '国家 / 地区' : 'Countries / Regions', knownRegions],
             ].map(([label, value]) => (
               <div key={label} className="min-w-0">
                 <dd className="text-lg font-semibold text-gray-200 sm:text-xl">{number(value)}</dd>
@@ -62,8 +62,8 @@ export default function VisitStatistics() {
           <VisitorGlobe data={data} compact />
           <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
             {isZh
-              ? '仅展示国家或地区级聚合数据，不保存原始 IP 或精确位置。历史数据来自 2026 年 5 月的手工快照。'
-              : 'Country-level aggregates only; no raw IP or precise location is stored. Historical data comes from a manual May 2026 snapshot.'}
+              ? '历史与新增访问已合并，仅展示国家或地区级聚合数据，不保存原始 IP 或精确位置。'
+              : 'Historical and new visits are combined. Only country-level aggregates are shown; no raw IP or precise location is stored.'}
           </p>
         </>
       )}
