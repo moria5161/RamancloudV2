@@ -59,7 +59,9 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
     } catch { return [[]]; }
   }, [previewData, wnIdx]);
 
+  const bounds = useMemo(() => sharedHeatmapBounds([heatmapZ]), [heatmapZ]);
   const traces = [{
+    ...bounds,
     z: heatmapZ,
     customdata: heatmapZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])),
     type: 'heatmap',
@@ -121,8 +123,9 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
     Array.isArray(data2D) ? data2D.map((_, index) => index) : []
   ), [data2D]);
   const bounds = useMemo(() => {
-    if (!difference) return {};
-    const { zmin = -1, zmax = 1 } = sharedHeatmapBounds([data2D]);
+    const bounds = sharedHeatmapBounds([data2D]);
+    if (!difference) return bounds;
+    const { zmin = -1, zmax = 1 } = bounds;
     const limit = Math.max(Math.abs(zmin), Math.abs(zmax), 1e-12);
     return { zmin: -limit, zmax: limit, zauto: false };
   }, [data2D, difference]);
@@ -172,7 +175,13 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
   const layout = useChartLayout(darkLayout, rawWavenumber);
   const { t } = usePreferences();
   const timeTitle = t(timeKind === 'time' ? timeUnit === 's' ? 'timeSeconds' : 'timeCoordinate' : 'timeIndex');
-  const bounds = useMemo(() => sharedColorScale ? sharedHeatmapBounds([rawData2D, processedData2D]) : {}, [rawData2D, processedData2D, sharedColorScale]);
+  const [rawBounds, processedBounds] = useMemo(() => {
+    if (sharedColorScale) {
+      const bounds = sharedHeatmapBounds([rawData2D, processedData2D]);
+      return [bounds, bounds];
+    }
+    return [sharedHeatmapBounds([rawData2D]), sharedHeatmapBounds([processedData2D])];
+  }, [rawData2D, processedData2D, sharedColorScale]);
   const hasProcessed = Array.isArray(processedData2D) && processedData2D.length > 0;
   const rawIndexAxis = useMemo(() => (
     Array.isArray(rawData2D) ? rawData2D.map((_, index) => index) : []
@@ -182,7 +191,7 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
   ), [processedData2D]);
   const traces = [
     {
-      ...bounds,
+      ...rawBounds,
       z: rawData2D || [[]],
       type: 'heatmap',
       colorscale: colorscale || 'Jet',
@@ -198,7 +207,7 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
 
   if (hasProcessed) {
     traces.push({
-      ...bounds,
+      ...processedBounds,
       z: processedData2D,
       type: 'heatmap',
       colorscale: colorscale || 'Jet',
@@ -332,11 +341,17 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
     return processedPreview.map(row => row.map(pixel => pixel[wnIdx] || 0));
   }, [processedPreview, wnIdx]);
 
-  const bounds = useMemo(() => sharedColorScale ? sharedHeatmapBounds([rawZ, procZ]) : {}, [rawZ, procZ, sharedColorScale]);
+  const [rawBounds, processedBounds] = useMemo(() => {
+    if (sharedColorScale) {
+      const bounds = sharedHeatmapBounds([rawZ, procZ]);
+      return [bounds, bounds];
+    }
+    return [sharedHeatmapBounds([rawZ]), sharedHeatmapBounds([procZ])];
+  }, [rawZ, procZ, sharedColorScale]);
   const sourceCoordinates = useMemo(() => rawZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])), [rawZ, coordinates, previewScale]);
   const traces = [
     {
-      ...bounds,
+      ...rawBounds,
       z: rawZ, type: 'heatmap', colorscale: 'Jet',
       customdata: sourceCoordinates,
       colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: 0.4, y: 0.79 },
@@ -347,7 +362,7 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
 
   if (procZ) {
     traces.push({
-      ...bounds,
+      ...processedBounds,
       z: procZ, type: 'heatmap', colorscale: 'Jet',
       customdata: sourceCoordinates,
       colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
