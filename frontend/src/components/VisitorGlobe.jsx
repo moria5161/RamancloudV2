@@ -4,10 +4,10 @@ import { usePreferences } from '../i18n';
 
 const Scene = lazy(() => import('./VisitorGlobeScene'));
 
-export default function VisitorGlobe({ data }) {
+export default function VisitorGlobe({ data, compact = false }) {
   const { language, theme } = usePreferences();
   const zh = language === 'zh';
-  const [mode, setMode] = useState('recorded');
+  const [mode, setMode] = useState(() => data.countries.some(item => item.code !== 'ZZ' && item.recorded > 0) ? 'recorded' : 'historical');
   const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [selected, setSelected] = useState(null);
   const [hovered, setHovered] = useState(null);
@@ -39,11 +39,11 @@ export default function VisitorGlobe({ data }) {
     return () => controller.abort();
   }, [nearby]);
   const iconButton = (name, Icon, action, pressed) => <button type="button" title={name} aria-label={name} aria-pressed={pressed} onClick={action} disabled={failed || !world} className="visitor-globe-tool"><Icon size={17} /></button>;
-  return <section ref={container} className="visitor-globe-section" aria-labelledby="visitor-globe-heading">
+  return <section ref={container} className={`visitor-globe-section ${compact ? 'is-compact' : ''}`} aria-labelledby="visitor-globe-heading">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h3 id="visitor-globe-heading" className="text-base font-semibold text-gray-200">{zh ? '全球访问分布' : 'Visitors Around the World'}</h3>
+      <h3 id="visitor-globe-heading" className="text-base font-semibold text-gray-200">{compact ? (zh ? '访问分布' : 'Visit distribution') : (zh ? '全球访问分布' : 'Visitors Around the World')}</h3>
       <div className="segmented-control" role="group" aria-label={zh ? '访问数据来源' : 'Visit data source'}>
-        {[['recorded', zh ? 'V2 新增' : 'New V2 visits'], ['historical', zh ? '历史快照 · 2026.05' : 'Archive · May 2026']].map(([value, label]) => <button type="button" key={value} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''}
+        {[['recorded', compact ? (zh ? 'V2 新增' : 'New V2') : (zh ? 'V2 新增' : 'New V2 visits')], ['historical', compact ? (zh ? '2026.05 历史' : 'May 2026') : (zh ? '历史快照 · 2026.05' : 'Archive · May 2026')]].map(([value, label]) => <button type="button" key={value} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''}
           onClick={() => { setMode(value); setSelected(null); setHovered(null); }}>{label}</button>)}
       </div>
     </div>
@@ -77,10 +77,12 @@ export default function VisitorGlobe({ data }) {
         {!!unknown && <p className="text-xs text-gray-500 pt-3">{zh ? '未知地区' : 'Unknown region'} · {number(unknown)}</p>}
       </div>
     </div>
-    <p className="text-xs text-gray-500 leading-relaxed">{zh ? '位置按 IP 所属国家 / 地区归类，标记位于地区代表位置，不代表访客精确坐标。历史地区计数来自截图，统计口径与 7,470 次累计浏览量可能不同。' : 'Visits are grouped by IP country or region. Markers use representative region locations, not precise visitor coordinates. Archived region counts come from screenshots and may use a different metric from the 7,470 historical pageviews.'}</p>
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-      <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">{zh ? 'IP 地理定位：DB-IP' : 'IP geolocation: DB-IP'}</a>
-      <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer">{zh ? '地图数据：Natural Earth' : 'Map data: Natural Earth'}</a>
-    </div>
+    {!compact && <>
+      <p className="text-xs text-gray-500 leading-relaxed">{zh ? '位置按 IP 所属国家 / 地区归类，标记位于地区代表位置，不代表访客精确坐标。历史地区计数来自截图，统计口径与 7,470 次累计浏览量可能不同。' : 'Visits are grouped by IP country or region. Markers use representative region locations, not precise visitor coordinates. Archived region counts come from screenshots and may use a different metric from the 7,470 historical pageviews.'}</p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+        <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">{zh ? 'IP 地理定位：DB-IP' : 'IP geolocation: DB-IP'}</a>
+        <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer">{zh ? '地图数据：Natural Earth' : 'Map data: Natural Earth'}</a>
+      </div>
+    </>}
   </section>;
 }
