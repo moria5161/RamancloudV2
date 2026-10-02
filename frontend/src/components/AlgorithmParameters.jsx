@@ -12,7 +12,7 @@ export default function AlgorithmParameters({ step, update, allowBatch = false }
       <select aria-label={t('method')} value={step.method} onChange={event => update({ method: event.target.value, params: algorithmDefaults(event.target.value) })}
         className="block w-full px-2 py-1.5 mt-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200">
         {options.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        <option value="skip">{t('skip')}</option>
+        {step.type !== 'baseline' && <option value="skip">{t('skip')}</option>}
       </select>
     </label>
     <div className="grid grid-cols-2 gap-2">
