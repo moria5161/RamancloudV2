@@ -93,11 +93,18 @@ export const researchCategories = [
     labelKey: 'researchStructure',
     papers: [
       {
-        title: 'Vib2Mol: from vibrational spectra to molecular structures - a versatile deep learning model',
-        titleZh: 'Vib2Mol：从振动光谱到分子结构的通用深度学习模型',
-        citation: 'arXiv:2503.07014',
-        url: 'https://arxiv.org/abs/2503.07014',
-        image: 'spec_str3.png',
+        title: 'Vib2Mol: from vibrational spectra to molecular structures—a unified deep learning framework',
+        titleZh: 'Vib2Mol：从振动光谱到分子结构的统一深度学习框架',
+        citation: 'Chem. Sci., 2026, DOI: 10.1039/D6SC04559F',
+        url: 'https://pubs.rsc.org/sc/article/doi/10.1039/d6sc04559f/1355321/Vib2Mol-from-vibrational-spectra-to-molecular',
+        image: 'vib2mol-toc.png',
+      },
+      {
+        title: 'Vib2Conf: AI-Driven Discrimination of Molecular Conformations from Vibrational Spectra',
+        titleZh: 'Vib2Conf：AI 驱动的振动光谱分子构象判别',
+        citation: 'Anal. Chem. 2026, 98, 35, 25817-25825',
+        url: 'https://pubs.acs.org/ancham/article/98/35/25817/5328295/Vib2Conf-AI-Driven-Discrimination-of-Molecular',
+        image: 'vib2conf-toc.png',
       },
       {
         title: 'Deep Learning-Assisted Spectrum-Structure Correlation: State-of-the-Art and Perspectives',
