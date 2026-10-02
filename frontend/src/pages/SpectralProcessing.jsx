@@ -173,7 +173,7 @@ export default function SpectralProcessing() {
                   <h3 className="text-lg font-semibold text-gray-300">{t('loadSpectralData')}</h3>
                   <p className="text-sm text-gray-500 mt-1">{t('loadSpectralDataDesc')}</p>
                 </div>
-                <div className="flex gap-3 justify-center">
+                <div className="flex flex-wrap gap-3 justify-center">
                   <button disabled={task.busy} onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium hover:from-indigo-500 hover:to-purple-500 transition-all shadow-lg shadow-indigo-500/20">
                     <Upload className="w-4 h-4" /> {t('uploadFile')}
@@ -201,10 +201,10 @@ export default function SpectralProcessing() {
         </div>
 
         {hasData && (
-          <div className="px-5 py-2 border-t border-white/5 flex items-center gap-4 text-xs text-gray-500">
+          <div className="px-5 py-2 border-t border-white/5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
             <span>{t('points')}: {rawData.wavenumber.length}</span>
             <span>{t('range')}: {rawData.wavenumber[0].toFixed(1)} – {rawData.wavenumber[rawData.wavenumber.length - 1].toFixed(1)} cm⁻¹</span>
-            {demoName && <span className="text-indigo-400">{t('demo')}: {demoName}</span>}
+            {demoName && <span className="text-indigo-400">{t(`${demoName}Demo`)}</span>}
           </div>
         )}
       </div>

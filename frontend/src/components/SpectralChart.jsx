@@ -83,18 +83,16 @@ export default function SpectralChart({
     });
   }
 
-  // Cut range shaded area
   const shapes = [];
   if (cutRange && rawData) {
-    shapes.push({
-      type: 'rect',
-      x0: cutRange[0],
-      x1: cutRange[1],
-      y0: 0,
-      y1: 1,
-      yref: 'paper',
-      fillcolor: 'rgba(129,140,248,0.05)',
-      line: { width: 1, color: 'rgba(129,140,248,0.2)', dash: 'dot' },
+    const minimum = Math.min(...rawData.wavenumber);
+    const maximum = Math.max(...rawData.wavenumber);
+    cutRange.forEach(boundary => {
+      if (boundary > minimum && boundary < maximum) shapes.push({
+        type: 'line', x0: boundary, x1: boundary,
+        y0: 0, y1: 1, yref: 'paper',
+        line: { width: 1, color: '#0071e3', dash: 'dot' },
+      });
     });
   }
 
