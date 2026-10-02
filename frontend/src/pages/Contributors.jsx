@@ -49,10 +49,10 @@ export default function Contributors() {
           <div className="space-y-3">
             {team.map(({ name, role, link, desc }) => (
               <div key={name} className="flex items-start gap-3 bg-black/20 rounded-lg p-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  {name.charAt(0)}
+                <div className="w-20 h-9 rounded-md bg-indigo-500/10 flex items-center justify-center text-indigo-400 text-xs font-medium shrink-0">
+                  {isZh ? '博士生' : 'PhD Student'}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     {link ? (
                       <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-gray-200 hover:text-indigo-400 transition-colors flex items-center gap-1">
@@ -77,8 +77,8 @@ export default function Contributors() {
             {[
               { name: 'Prof. Bin Ren', link: 'https://chem.xmu.edu.cn/en/info/1010/1352.htm' },
               { name: 'Prof. Guokun Liu', link: 'https://mel2.xmu.edu.cn/staff.asp?tid=587' },
-              { name: 'Prof. Xiang Wang', link: 'https://chem.xmu.edu.cn/en/info/1010/1815.htm' },
               { name: 'Prof. Hao Ma', link: 'https://www.researchgate.net/profile/Hao-Ma-20' },
+              { name: 'Prof. Xiang Wang', link: 'https://chem.xmu.edu.cn/en/info/1010/1815.htm' },
             ].map(({ name, link }) => (
               <a key={name} href={link} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-gray-300 hover:text-indigo-400 transition-colors">
