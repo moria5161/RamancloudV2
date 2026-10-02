@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Microscope, TrendingUp, BookOpen } from 'lucide-react';
+import { Sparkles, ArrowRight, Activity, Layers, BookOpen } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import RecentResearch from '../components/RecentResearch';
 import Feedback from '../components/Feedback';
@@ -42,7 +42,7 @@ export default function HomePage() {
             <Link to="/spectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-400" />
+                  <Activity className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-200">{t('spectralProcessing')}</h3>
@@ -57,7 +57,7 @@ export default function HomePage() {
             <Link to="/hyperspectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <Microscope className="w-5 h-5 text-purple-400" />
+                  <Layers className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-200">{t('hyperspectralProcessing')}</h3>
