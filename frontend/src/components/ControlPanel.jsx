@@ -15,7 +15,6 @@ export default function ControlPanel({
   onDemoChange,
   demos,
   cutRange,
-  onCutRangeChange,
   hasData,
   busy = false,
   hasResult = false,
@@ -68,26 +67,6 @@ export default function ControlPanel({
           )}
         </div>
 
-        {/* Quick cut range */}
-        <fieldset disabled={busy} className="mt-3 space-y-1.5">
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('quickCutRange')}</label>
-          <div className="flex gap-1.5">
-            <input
-              type="number"
-              placeholder={t('min')}
-              value={cutRange?.[0] ?? ''}
-              onChange={e => onCutRangeChange?.([parseFloat(e.target.value) || 0, cutRange?.[1] || 4000])}
-              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
-            />
-            <input
-              type="number"
-              placeholder={t('max')}
-              value={cutRange?.[1] ?? ''}
-              onChange={e => onCutRangeChange?.([cutRange?.[0] || 0, parseFloat(e.target.value) || 4000])}
-              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
-            />
-          </div>
-        </fieldset>
       </div>
 
       {/* Pipeline steps */}
