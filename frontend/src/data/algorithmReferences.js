@@ -36,21 +36,10 @@ export const algorithmReferences = [
     zh: '带噪声阈值的迭代多项式拟合，与 V1 一样使用 pybaselines 实现。',
   },
   {
-    id: 'airpls_old', group: 'baseline', name: 'airPLS (Legacy)',
-    url: 'https://doi.org/10.1039/B922045C',
-    en: 'Uses the V1 legacy airPLS weighting scheme. V2 also applies the selected difference order, which V1 ignored.',
-    zh: '保留 V1 旧版 airPLS 的权重迭代方式，并修正了 V1 中差分阶数参数不生效的问题。',
-  },
-  {
     id: 'snip', group: 'baseline', name: 'SNIP',
     url: 'https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.snip.html',
     en: 'Estimates the background through decreasing-window iterative peak clipping, using pybaselines as in V1.',
     zh: '使用逐步缩小窗口的迭代削峰估计背景，与 V1 一样使用 pybaselines 实现。',
   },
   {"id":"tsvd","group":"denoise","name":"Truncated SVD (TSVD)","url":"https://numpy.org/doc/stable/reference/generated/numpy.linalg.svd.html","en":"Filters singular values using V1’s log-spectrum curvature threshold. For aligned batches, imaging, or time series, not individual spectra.","zh":"按照 V1 的奇异值对数曲率阈值过滤分量，用于波数一致的批量光谱、成像或时间序列，不适用于单条光谱。"},
-  {"id":"aspls","group":"baseline","name":"asPLS","en":"Adaptively smooths a weighted penalized least-squares baseline.","zh":"自适应调整平滑强度的加权惩罚最小二乘基线估计。","url":"https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.aspls.html"},
-  {"id":"penalizedpoly","group":"baseline","name":"Penalized Polynomial","en":"Fits a polynomial with a robust penalty to reduce peak influence.","zh":"利用稳健惩罚函数进行多项式拟合，减少光谱峰的影响。","url":"https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.penalized_poly.html"},
-  {"id":"rollingball","group":"baseline","name":"Rolling Ball","en":"Uses a rolling morphological window and smoothing to estimate the background.","zh":"通过滑动形态学窗口与平滑估计背景。","url":"https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.rolling_ball.html"},
-  {"id":"mormol","group":"baseline","name":"Mormol","en":"Iteratively combines morphological operations and mollification to estimate the baseline.","zh":"通过形态学运算与平滑的迭代组合估计基线。","url":"https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.mormol.html"},
-  {"id":"irsqr","group":"baseline","name":"IRSQR","en":"Iteratively reweighted spline quantile regression; quantile sets the background level.","zh":"迭代重加权样条分位数回归，分位数用于控制背景水平。","url":"https://pybaselines.readthedocs.io/en/stable/generated/api/pybaselines.Baseline.irsqr.html"},
 ];

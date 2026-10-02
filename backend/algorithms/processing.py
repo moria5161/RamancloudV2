@@ -4,7 +4,6 @@ from pybaselines import Baseline
 from scipy.signal import savgol_filter
 
 from .v1_aabs import aabs
-from .v1_airpls import ZhangFit
 from .v1_peer import peer_process
 
 
@@ -15,19 +14,13 @@ PARAMETERS = {
     'peer': {'loops': (3, int, 1, 20), 'half_k_threshold': (2, int, 0, 7)},
     'tsvd': {'threshold': (0.001, float, 0, 100)},
     'airpls': {'lam': (1e7, float, 1e-12, 1e12), 'diff_order': (3, int, 1, 3)},
-    'aspls': {'lam': (1e7, float, 1e-12, 1e12), 'diff_order': (3, int, 1, 3)},
     'aabs': {'Ln': (6, int, 2, 100), 'Lb': (140, int, 5, 1000)},
     'imodpoly': {'poly_order': (3, int, 0, 10)},
-    'penalizedpoly': {'poly_order': (3, int, 0, 10)},
-    'airpls_old': {'lam': (100, float, 1e-12, 1e12), 'diff_order': (1, int, 1, 3)},
-    'rollingball': {'half_window': (40, int, 1, 1000)},
-    'mormol': {'half_window': (40, int, 1, 1000)},
-    'irsqr': {'lam': (50, float, 1e-12, 1e12), 'quantile': (0.05, float, 0.001, 0.999)},
     'snip': {'max_half_window': (20, int, 1, 1000), 'smooth_half_window': (7, int, 0, 1000)},
     'skip': {},
 }
 DENOISE_METHODS = ('sg', 'wtd', 'peer', 'tsvd', 'skip')
-BASELINE_METHODS = ('airpls', 'aspls', 'aabs', 'imodpoly', 'penalizedpoly', 'airpls_old', 'rollingball', 'mormol', 'irsqr', 'snip', 'skip')
+BASELINE_METHODS = ('airpls', 'aabs', 'imodpoly', 'snip', 'skip')
 
 
 def validated_parameters(method, params):
@@ -115,15 +108,10 @@ def correct_baseline(y, params, method):
             raise ValueError('AABS requires at least max(100, Ln, Lb) spectral points')
         corrected = aabs(np.arange(len(y)), y.copy(), **p)
         return corrected, y - corrected
-    if method == 'airpls_old':
-        # V1 ignored its difference-order parameter; V2 fixes that while retaining its weights.
-        corrected = ZhangFit(y, lambda_=p['lam'], porder=p['diff_order'])
-        return corrected, y - corrected
     fitter = Baseline(x_data=np.linspace(0, len(y), len(y)))
-    names = {'penalizedpoly': 'penalized_poly', 'rollingball': 'rolling_ball'}
     if method == 'snip':
         if p['max_half_window'] > (len(y) - 1) // 2:
             raise ValueError('SNIP maximum half window exceeds half the spectral length')
         p['decreasing'] = True
-    baseline, _ = getattr(fitter, names.get(method, method))(y, **p)
+    baseline, _ = getattr(fitter, method)(y, **p)
     return y - baseline, baseline
