@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import SettingsPanel from './components/SettingsPanel';
-import { PreferencesProvider } from './i18n';
+import { PreferencesProvider, usePreferences } from './i18n';
 import HomePage from './pages/HomePage';
 import SpectralProcessing from './pages/SpectralProcessing';
 import HyperspectralProcessing from './pages/HyperspectralProcessing';
@@ -12,17 +12,28 @@ import Contributors from './pages/Contributors';
 import useVisitTracking from './hooks/useVisitTracking';
 
 function WelcomeScreen() {
+  const { language } = usePreferences();
   const [showWelcome, setShowWelcome] = useState(true);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
+    if (finished) return;
     const reveal = setTimeout(() => setShowWelcome(false), 1950);
     const finish = setTimeout(() => setFinished(true), 2500);
     return () => { clearTimeout(reveal); clearTimeout(finish); };
-  }, []);
+  }, [finished]);
 
   if (finished) return null;
-  return <div className={`welcome-screen ${showWelcome ? 'is-visible' : 'is-hidden'}`}>
+  return <div className={`welcome-screen ${showWelcome ? 'is-visible' : 'is-hidden'}`}
+    role="button" tabIndex={showWelcome ? 0 : -1}
+    aria-label={language === 'zh' ? '跳过欢迎动画' : 'Skip welcome animation'}
+    onClick={() => setFinished(true)}
+    onKeyDown={event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setFinished(true);
+      }
+    }}>
     <div className="welcome-title" aria-label="Welcome to Ramancloud">
       <span className="welcome-word" aria-hidden="true">Welcome</span>{' '}
       <span className="welcome-word" aria-hidden="true">to</span>{' '}
