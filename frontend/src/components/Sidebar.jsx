@@ -24,7 +24,7 @@ export default function Sidebar() {
         <div className="sidebar-brand p-5 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="sidebar-logo w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <CloudLogo className="w-7 h-7" />
+              <CloudLogo className="w-9 h-9" />
             </div>
             <div className="sidebar-label">
               <h1 className="text-lg font-bold text-white tracking-tight">RamanCloud</h1>

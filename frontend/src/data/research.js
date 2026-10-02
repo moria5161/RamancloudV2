@@ -1,0 +1,118 @@
+export const researchCategories = [
+  {
+    id: 'classification',
+    labelKey: 'researchClassification',
+    papers: [
+      {
+        title: 'Patch-Based Convolutional Encoder: A Deep Learning Algorithm for Spectral Classification Balancing the Local and Global Information',
+        titleZh: '基于图块的卷积编码器：平衡局部与全局信息的光谱分类深度学习算法',
+        citation: 'Anal. Chem. 2024, 96, 7, 2866-2873',
+        url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.3c03889',
+        image: 'spec_cls4.jpeg',
+      },
+      {
+        title: '1D Gradient-Weighted Class Activation Mapping, Visualizing Decision Process of Convolutional Neural Network-Based Models in Spectroscopy Analysis',
+        titleZh: '一维梯度加权类激活映射：可视化光谱分析中卷积神经网络模型的决策过程',
+        citation: 'Anal. Chem. 2023, 95, 26, 9959-9966',
+        url: 'https://doi.org/10.1021/acs.analchem.3c01101',
+        image: 'spec_cls3.jpeg',
+      },
+      {
+        title: 'Deep Learning-Enabled Raman Spectroscopic analysis of Pathogen-Derived Extracellular Vesicles and the Biogenesis Process',
+        titleZh: '深度学习辅助拉曼光谱分析病原体来源的细胞外囊泡及其生物发生过程',
+        citation: 'Anal. Chem. 2022, 94, 36, 12416-12426',
+        url: 'https://doi.org/10.1021/acs.analchem.2c02226',
+        image: 'spec_cls2.jpeg',
+      },
+      {
+        title: 'Visualization of a Machine Learning Framework toward Highly Sensitive Qualitative Analysis by SERS',
+        titleZh: '面向高灵敏度 SERS 定性分析的机器学习框架可视化',
+        citation: 'Anal. Chem. 2022, 94, 28, 10151-10158',
+        url: 'https://doi.org/10.1021/acs.analchem.2c01450',
+        image: 'spec_cls1.jpeg',
+      },
+    ],
+  },
+  {
+    id: 'denoising',
+    labelKey: 'researchDenoising',
+    papers: [
+      {
+        title: 'Signal2signal: Pushing the Spatiotemporal Resolution to the Limit by Single Chemical Hyperspectral Imaging',
+        titleZh: 'Signal2signal：通过单次化学高光谱成像推进时空分辨率极限',
+        citation: 'Anal. Chem. 2024, 96, 17, 6550-6557',
+        url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.3c04609',
+        image: 'deno_sr6.jpeg',
+      },
+      {
+        title: 'Revealing the Denoising Principle of Zero-Shot N2N-Based Algorithm from 1D Spectrum to 2D Image',
+        titleZh: '揭示零样本 N2N 算法从一维光谱到二维图像的降噪原理',
+        citation: 'Anal. Chem. 2024, 96, 10, 4086-4092',
+        url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.3c04608',
+        image: 'deno_sr5.jpeg',
+      },
+      {
+        title: 'Noise learning of instruments for high-contrast, high-resolution and fast hyperspectral microscopy and nanoscopy',
+        titleZh: '仪器噪声学习：实现高对比度、高分辨率和快速高光谱显微及纳米成像',
+        citation: 'Nat Commun 15, 754 (2024)',
+        url: 'https://www.nature.com/articles/s41467-024-44864-5',
+        image: 'deno_sr4.jpeg',
+      },
+      {
+        title: 'Developing a Peak Extraction and Retention (PEER) Algorithm for Improving the Temporal Resolution of Raman Spectroscopy',
+        titleZh: '开发峰提取与保留（PEER）算法，提高拉曼光谱的时间分辨率',
+        citation: 'Anal. Chem. 2021, 93, 24, 8408-8413',
+        url: 'https://doi.org/10.1021/acs.analchem.0c05391',
+        image: 'deno_sr3.jpeg',
+      },
+      {
+        title: 'Collaborative Low-Rank Matrix Approximation-Assisted Fast Hyperspectral Raman Imaging and Tip-Enhanced Raman Spectroscopic Imaging',
+        titleZh: '协同低秩矩阵近似辅助快速高光谱拉曼成像与针尖增强拉曼光谱成像',
+        citation: 'Anal. Chem. 2021, 93, 44, 14609-14617',
+        url: 'https://doi.org/10.1021/acs.analchem.1c02071',
+        image: 'deno_sr2.jpeg',
+      },
+      {
+        title: 'Deep Learning for Biospectroscopy and Biospectral Imaging: State-of-the-Art and Perspectives',
+        titleZh: '生物光谱与生物光谱成像中的深度学习：现状与展望',
+        citation: 'Anal. Chem. 2021, 93, 8, 3653-3665',
+        url: 'https://doi.org/10.1021/acs.analchem.0c04671',
+        image: 'review1.gif',
+      },
+      {
+        title: 'Speeding Up the Line-Scan Raman Imaging of Living Cells by Deep Convolutional Neural Network',
+        titleZh: '深度卷积神经网络加速活细胞线扫描拉曼成像',
+        citation: 'Anal. Chem. 2019, 91, 11, 7070-7077',
+        url: 'https://doi.org/10.1021/acs.analchem.8b05962',
+        image: 'deno_sr1.jpeg',
+      },
+    ],
+  },
+  {
+    id: 'structure',
+    labelKey: 'researchStructure',
+    papers: [
+      {
+        title: 'Vib2Mol: from vibrational spectra to molecular structures - a versatile deep learning model',
+        titleZh: 'Vib2Mol：从振动光谱到分子结构的通用深度学习模型',
+        citation: 'arXiv:2503.07014',
+        url: 'https://arxiv.org/abs/2503.07014',
+        image: 'spec_str3.png',
+      },
+      {
+        title: 'Deep Learning-Assisted Spectrum-Structure Correlation: State-of-the-Art and Perspectives',
+        titleZh: '深度学习辅助光谱与结构关联：现状与展望',
+        citation: 'Anal. Chem. 2024, 96, 20, 7959-7975',
+        url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.4c01639',
+        image: 'spec_str2.jpeg',
+      },
+      {
+        title: 'Rapidly determining the 3D structure of proteins by surface-enhanced Raman spectroscopy',
+        titleZh: '通过表面增强拉曼光谱快速确定蛋白质三维结构',
+        citation: 'Sci. Adv., 2023, 9, eadh8362',
+        url: 'https://www.science.org/doi/10.1126/sciadv.adh8362',
+        image: 'spec_str1.png',
+      },
+    ],
+  },
+];
