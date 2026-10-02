@@ -4,6 +4,8 @@ import { usePreferences } from '../i18n';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import AlgorithmParameters from './AlgorithmParameters';
+import { algorithms, algorithmDefaults } from '../data/algorithms';
 
 function SortableStep({ id, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -14,13 +16,16 @@ function SortableStep({ id, children }) {
   );
 }
 
-function stepSummary(step, t) {
+function stepSummary(step, t, language) {
   if (step.type === 'cut') return `${step.params.start} - ${step.params.end} cm⁻¹`;
   if (step.method === 'sg') return `SG · ${t('window')} ${step.params.window_size} · ${t('order')} ${step.params.order}`;
   if (step.method === 'wtd') return `WTD · ${step.params.wavelet || 'db3'} · ${t('level')} ${step.params.level || 3}`;
   if (step.method === 'skip') return t('skip');
-  const labels = { lam: 'lambda', diff_order: 'diffOrder', poly_order: 'polyOrder', loops: 'loops', half_k_threshold: 'peakSeek', half_window: 'halfWindow' };
-  return `${step.method} · ${Object.entries(step.params).map(([key, value]) => `${t(labels[key] || key)} ${typeof value === 'number' && value >= 10000 ? value.toExponential(0) : value}`).join(' · ')}`;
+  const fields = algorithms.find(item => item.id === step.method)?.fields || [];
+  return `${step.method} · ${Object.entries(step.params).map(([key, value]) => {
+    const field = fields.find(item => item.key === key);
+    return `${field ? (language === 'zh' ? field.zh : field.label) : key} ${typeof value === 'number' && value >= 10000 ? value.toExponential(0) : value}`;
+  }).join(' · ')}`;
 }
 
 const STEP_TYPES = {
@@ -29,25 +34,10 @@ const STEP_TYPES = {
   baseline: { icon: Baseline, labelKey: 'baseline', color: 'from-purple-500 to-pink-600' },
 };
 
-const DENOISE_OPTIONS = [
-  { value: 'sg', label: 'Savitzky-Golay' },
-  { value: 'wtd', label: 'Wavelet (WTD)' },
-  { value: 'peer', label: 'PEER' },
-  { value: 'skip', labelKey: 'skip' },
-];
 
-const BASELINE_OPTIONS = [
-  { value: 'airpls', label: 'airPLS' },
-  { value: 'aabs', label: 'Auto-Adaptive' },
-  { value: 'imodpoly', label: 'IModPoly' },
-  { value: 'airpls_old', label: 'airPLS (Legacy)' },
-  { value: 'snip', label: 'SNIP' },
-  { value: 'skip', labelKey: 'skip' },
-];
-
-export default function StepController({ steps, onChange, defaultCutRange }) {
+export default function StepController({ steps, onChange, defaultCutRange, allowBatch = false }) {
   const [expandedStep, setExpandedStep] = useState(null);
-  const { t } = usePreferences();
+  const { t, language } = usePreferences();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -60,11 +50,10 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
       method: type === 'cut' ? 'cut' : type === 'denoise' ? 'sg' : 'airpls',
       params: type === 'cut'
         ? { start: defaultCutRange?.[0] ?? 0, end: defaultCutRange?.[1] ?? 4000 }
-        : type === 'denoise'
-          ? { window_size: 7, order: 3 }
-          : { lam: 1e7, diff_order: 3 },
+        : algorithmDefaults(type === 'denoise' ? 'sg' : 'airpls'),
     };
     onChange([...steps, newStep]);
+    setExpandedStep(newStep.id);
   };
 
   const removeStep = (id) => {
@@ -72,13 +61,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
   };
 
   const updateStep = (id, updates) => {
-    const defaults = {
-      sg: { window_size: 7, order: 3 }, wtd: { wavelet: 'db3', level: 3 },
-      peer: { loops: 3, half_k_threshold: 2 }, airpls: { lam: 1e7, diff_order: 3 },
-      aabs: { lam: 1e7, diff_order: 2, Ln: 6, Lb: 140 },
-      imodpoly: { poly_order: 3 }, airpls_old: { poly_order: 3 }, snip: { half_window: 40 }, skip: {},
-    };
-    onChange(steps.map(s => s.id === id ? { ...s, ...(updates.method ? { params: defaults[updates.method] || {} } : {}), ...updates } : s));
+    onChange(steps.map(s => s.id === id ? { ...s, ...updates } : s));
   };
 
   const moveStep = (index, direction) => {
@@ -151,7 +134,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                   </button>
                 </div>
               </div>
-              {!isExpanded && <p className="step-summary px-3 pb-3 text-xs text-gray-500">{stepSummary(step, t)}</p>}
+              {!isExpanded && <p className="step-summary px-3 pb-3 text-xs text-gray-500">{stepSummary(step, t, language)}</p>}
 
               {/* Step params */}
               {isExpanded && (
@@ -163,7 +146,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                         <input
                           type="number"
                           value={step.params.start}
-                          onChange={e => updateStep(step.id, { params: { ...step.params, start: parseFloat(e.target.value) || 0 } })}
+                          onChange={e => updateStep(step.id, { params: { ...step.params, start: e.target.value === '' ? '' : Number(e.target.value) } })}
                           className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
                           placeholder={t('start')}
                         />
@@ -171,7 +154,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                         <input
                           type="number"
                           value={step.params.end}
-                          onChange={e => updateStep(step.id, { params: { ...step.params, end: parseFloat(e.target.value) || 4000 } })}
+                          onChange={e => updateStep(step.id, { params: { ...step.params, end: e.target.value === '' ? '' : Number(e.target.value) } })}
                           className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
                           placeholder={t('end')}
                         />
@@ -179,131 +162,7 @@ export default function StepController({ steps, onChange, defaultCutRange }) {
                     </div>
                   )}
 
-                  {step.type === 'denoise' && (
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400">{t('method')}</label>
-                      <select
-                        value={step.method}
-                        onChange={e => updateStep(step.id, { method: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
-                      >
-                        {DENOISE_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.labelKey ? t(o.labelKey) : o.label}</option>
-                        ))}
-                      </select>
-                      {step.method === 'sg' && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('window')}</label>
-                            <input type="number" value={step.params.window_size}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, window_size: parseInt(e.target.value) || 7 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('order')}</label>
-                            <input type="number" value={step.params.order}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, order: parseInt(e.target.value) || 3 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                        </div>
-                      )}
-                      {step.method === 'peer' && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('loops')}</label>
-                            <input type="number" value={step.params.loops || 3}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, loops: parseInt(e.target.value) || 3 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('peakSeek')}</label>
-                            <input type="number" value={step.params.half_k_threshold || 2}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, half_k_threshold: parseInt(e.target.value) || 2 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                        </div>
-                      )}
-                      {step.method === 'wtd' && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('wavelet')}</label>
-                            <select value={step.params.wavelet || 'db3'}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, wavelet: e.target.value } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none">
-                              {['db1','db2','db3','db4','db5','db6','db7','db8'].map(w => (
-                                <option key={w} value={w}>{w}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('level')}</label>
-                            <input type="number" value={step.params.level || 3}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, level: parseInt(e.target.value) || 3 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {step.type === 'baseline' && (
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400">{t('method')}</label>
-                      <select
-                        value={step.method}
-                        onChange={e => updateStep(step.id, { method: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
-                      >
-                        {BASELINE_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.labelKey ? t(o.labelKey) : o.label}</option>
-                        ))}
-                      </select>
-                      {step.method === 'airpls' && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('lambda')}</label>
-                            <select value={step.params.lam || 1e7}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, lam: parseFloat(e.target.value) } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none">
-                              {[1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10].map(v => (
-                                <option key={v} value={v}>{v.toExponential(0)}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500">{t('diffOrder')}</label>
-                            <input type="number" value={step.params.diff_order || 3}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, diff_order: parseInt(e.target.value) || 3 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none" />
-                          </div>
-                        </div>
-                      )}
-                      {step.method === 'aabs' && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500">Ln</label>
-                            <input type="number" value={step.params.Ln || 6}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, Ln: parseInt(e.target.value) || 6 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200" />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500">Lb</label>
-                            <input type="number" value={step.params.Lb || 140}
-                              onChange={e => updateStep(step.id, { params: { ...step.params, Lb: parseInt(e.target.value) || 140 } })}
-                              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200" />
-                          </div>
-                        </div>
-                      )}
-                      {step.method === 'imodpoly' && (
-                        <div>
-                          <label className="text-[10px] text-gray-500">{t('polyOrder')}</label>
-                          <input type="number" value={step.params.poly_order || 3}
-                            onChange={e => updateStep(step.id, { params: { ...step.params, poly_order: parseInt(e.target.value) || 3 } })}
-                            className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200" />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {step.type !== 'cut' && <AlgorithmParameters step={step} allowBatch={allowBatch} update={updates => updateStep(step.id, updates)} />}
                 </div>
               )}
             </div>

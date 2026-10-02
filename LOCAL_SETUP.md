@@ -5,10 +5,10 @@ Run RamanCloud on your own computer with a Python backend and a browser-based fr
 ## Requirements
 
 - Git
-- Python 3.10 with pip and virtual environment support
+- Python 3.11 with pip and virtual environment support
 - Node.js 22 or 24 with npm (frontend dependencies require Node.js 20 or newer)
 
-The backend currently pins older versions of Pydantic and Uvicorn. Use Python 3.10 for this setup rather than assuming compatibility with newer Python versions.
+Python 3.11 is the tested runtime. Baseline correction uses pybaselines 1.2.1.
 
 ## Get the Code
 
@@ -25,8 +25,8 @@ In your first terminal, from the repository root:
 
 ```bash
 cd backend
-python3.10 -m venv venv
-source venv/bin/activate
+python3.11 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 python app.py
 ```
@@ -34,8 +34,8 @@ python app.py
 On Windows PowerShell, replace the virtual environment creation and activation commands with:
 
 ```powershell
-py -3.10 -m venv venv
-.\venv\Scripts\Activate.ps1
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
 Keep this terminal open. The API listens on `http://127.0.0.1:5000`; its interactive documentation is at `http://127.0.0.1:5000/docs`.

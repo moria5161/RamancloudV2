@@ -26,8 +26,17 @@ export default function ControlPanel({
   uploadedSpectra = [],
   selectedSpectrum = 0,
   onSpectrumChange,
+  processAll = false,
+  onProcessAllChange,
+  allowBatch = false,
+  hasBaseline = false,
+  onDownloadBaseline,
+  hasBatchResult = false,
+  onBatchDownload,
+  batchStale = false,
 }) {
-  const { t } = usePreferences();
+  const { t, language } = usePreferences();
+  const isZh = language === 'zh';
 
   return (
     <div className="h-full flex flex-col glass border-l border-white/5">
@@ -65,13 +74,17 @@ export default function ControlPanel({
               </select>
             </div>
           )}
+          {uploadedSpectra.length > 1 && <label className="flex items-center gap-2 text-xs text-gray-500">
+            <input type="checkbox" checked={processAll} disabled={busy} onChange={event => onProcessAllChange(event.target.checked)} />
+            {isZh ? `对全部 ${uploadedSpectra.length} 条光谱应用流程` : `Apply pipeline to all ${uploadedSpectra.length} spectra`}
+          </label>}
         </div>
 
       </div>
 
       {/* Pipeline steps */}
       <fieldset disabled={busy} className="flex-1 overflow-y-auto p-4 min-h-0">
-        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} />
+        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} allowBatch={allowBatch || processAll} />
       </fieldset>
 
       {/* Action buttons */}
@@ -79,6 +92,14 @@ export default function ControlPanel({
         <div role="status" className={`text-xs ${isStale ? 'text-amber-600' : 'text-gray-500'}`}>
           {hasResult && (isStale ? t('resultStale') : `${t('processingComplete')} · ${elapsed?.toFixed(2)} s`)}
         </div>
+        {hasBaseline && <button onClick={onDownloadBaseline} disabled={busy || isStale}
+          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-white/5 text-xs text-gray-400">
+          <Download className="w-3.5 h-3.5" />{isZh ? '下载独立基线' : 'Download baseline'}
+        </button>}
+        {hasBatchResult && <button onClick={onBatchDownload} disabled={busy || batchStale}
+          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-white/5 text-xs text-gray-400">
+          <Download className="w-3.5 h-3.5" />{isZh ? '下载批量结果' : 'Download batch results'}
+        </button>}
         <button
           onClick={onProcess}
           disabled={busy || !hasData || steps.length === 0}

@@ -7,7 +7,7 @@ import axios from 'axios';
 import { usePreferences } from '../i18n';
 import useWorkspaceTask from '../hooks/useWorkspaceTask';
 import WorkspaceFeedback from '../components/WorkspaceFeedback';
-import { createProcessingRecord, exportResult, pipelineSignature } from '../utils/processingRecord';
+import { createProcessingRecord, exportResult, exportArchive, pipelineSignature } from '../utils/processingRecord';
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 const DEMOS = ['bacteria', 'ulf', 'tutorial'];
@@ -29,6 +29,8 @@ export default function SpectralProcessing() {
   const [includeRecord, setIncludeRecord] = useState(true);
   const [uploadedSpectra, setUploadedSpectra] = useState([]);
   const [selectedSpectrum, setSelectedSpectrum] = useState(0);
+  const [processAll, setProcessAll] = useState(false);
+  const [batchResult, setBatchResult] = useState(null);
   const cutRange = useMemo(() => {
     const cut = steps.find(step => step.type === 'cut');
     if (cut) return [cut.params.start, cut.params.end];
@@ -37,6 +39,8 @@ export default function SpectralProcessing() {
   const isStale = !!runRecord && pipelineSignature(steps) !== JSON.stringify(runRecord.steps);
 
   const applyData = (data, source, demo = '') => {
+    setBatchResult(null);
+    setProcessAll(false);
     setRawData({ wavenumber: data.wavenumber, intensity: data.intensity });
     setProcessedData(null);
     setBaselineData(null);
@@ -83,6 +87,18 @@ export default function SpectralProcessing() {
       setIsProcessing(true);
       const started = performance.now();
       try {
+        if (processAll && uploadedSpectra.length > 1) {
+          const snapshot = JSON.parse(pipelineSignature(steps));
+          const { data: res } = await axios.post(`${API_BASE}/api/process-batch`, { spectra: uploadedSpectra, steps: snapshot });
+          if (res.code !== 0) throw new Error(res.msg);
+          const records = res.data.spectra.map((result, index) => createProcessingRecord(result.filename, 'spectrum', uploadedSpectra[index], result, steps, started));
+          setBatchResult({ spectra: res.data.spectra, records, signature: pipelineSignature(steps) });
+          const result = res.data.spectra[selectedSpectrum];
+          setProcessedData(result);
+          setBaselineData(result.baseline);
+          setRunRecord(records[selectedSpectrum]);
+          return;
+        }
         const { data: res } = await axios.post(`${API_BASE}/api/process`, {
           wavenumber: rawData.wavenumber, intensity: rawData.intensity,
           steps: JSON.parse(pipelineSignature(steps)),
@@ -92,6 +108,33 @@ export default function SpectralProcessing() {
         setBaselineData(res.data.baseline || null);
         setRunRecord(createProcessingRecord(fileName || demoName, 'spectrum', rawData, res.data, steps, started));
       } finally { setIsProcessing(false); }
+    });
+  };
+
+  const handleDownloadBaseline = () => {
+    if (!baselineData || isStale || task.busy) return;
+    task.run('preparingDownload', async () => {
+      const filename = `baseline_${(fileName || demoName || 'spectrum').replace(/\.[^.]+$/, '')}.txt`;
+      const { data } = await axios.post(`${API_BASE}/api/download`, { wavenumber: processedData.wavenumber, intensity: baselineData, filename }, { responseType: 'blob' });
+      await exportResult(data, filename, { ...runRecord, data_kind: 'baseline', columns: ['wavenumber', 'baseline'] }, includeRecord);
+    });
+  };
+
+  const handleBatchDownload = () => {
+    if (!batchResult || batchResult.signature !== pipelineSignature(steps) || task.busy) return;
+    task.run('preparingDownload', async () => {
+      const entries = [];
+      for (let index = 0; index < batchResult.spectra.length; index += 1) {
+        const result = batchResult.spectra[index];
+        const name = `${index + 1}_${result.filename.replace(/[\\/]/g, '_').replace(/\.[^.]+$/, '')}.txt`;
+        const { data } = await axios.post(`${API_BASE}/api/download`, { wavenumber: result.wavenumber, intensity: result.intensity }, { responseType: 'blob' });
+        entries.push([`spectra/${name}`, data]);
+        if (result.baseline) {
+          const response = await axios.post(`${API_BASE}/api/download`, { wavenumber: result.wavenumber, intensity: result.baseline }, { responseType: 'blob' });
+          entries.push([`baselines/${name}`, response.data]);
+        }
+      }
+      await exportArchive(entries, includeRecord ? batchResult.records : null);
     });
   };
 
@@ -108,6 +151,7 @@ export default function SpectralProcessing() {
   };
 
   const handleReset = () => {
+    setBatchResult(null);
     setProcessedData(null);
     setBaselineData(null);
     setRunRecord(null);
@@ -116,6 +160,7 @@ export default function SpectralProcessing() {
 
   const handleClear = () => {
     handleReset();
+    setProcessAll(false);
     setRawData(null);
     setFileName(null);
     setDemoName('');
@@ -209,12 +254,22 @@ export default function SpectralProcessing() {
           onIncludeRecordChange={setIncludeRecord} onClear={handleClear}
           onDemoChange={loadDemo} demos={DEMOS}
           uploadedSpectra={uploadedSpectra} selectedSpectrum={selectedSpectrum}
+          processAll={processAll} onProcessAllChange={setProcessAll}
+          hasBaseline={!!baselineData} onDownloadBaseline={handleDownloadBaseline}
+          hasBatchResult={!!batchResult} onBatchDownload={handleBatchDownload}
+          batchStale={!!batchResult && batchResult.signature !== pipelineSignature(steps)}
           onSpectrumChange={index => {
             if (task.busy || !uploadedSpectra[index]) return;
             setSelectedSpectrum(index);
             task.setError(null);
             setError(null);
-            applyData(uploadedSpectra[index], uploadedSpectra[index].filename);
+            const source = uploadedSpectra[index];
+            setRawData({ wavenumber: source.wavenumber, intensity: source.intensity });
+            setFileName(source.filename);
+            const result = batchResult?.spectra[index];
+            setProcessedData(result || null);
+            setBaselineData(result?.baseline || null);
+            setRunRecord(batchResult?.records[index] || null);
           }}
           cutRange={cutRange}
         />

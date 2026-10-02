@@ -10,7 +10,7 @@ export default function AlgorithmReferences() {
     <section id="references" aria-labelledby="references-heading" className="space-y-5 border-t border-white/10 pt-8">
       <h2 id="references-heading" className="text-lg font-semibold text-gray-200">{isZh ? '算法与参考文献' : 'References'}</h2>
       <p className="text-sm text-gray-400">
-        {isZh ? '以下方法用于单光谱、成像和时间序列的预处理。部分 V2 算法为简化实现，并非原始论文的完整复现；各条目注明了实现差异。' : 'These methods are used in spectral, imaging, and time-series preprocessing. Some V2 algorithms are simplified implementations, not full reproductions of the original papers; differences are noted below.'}
+        {isZh ? '以下方法用于单光谱、成像和时间序列的预处理。算法沿用 V1 的实现或同名科学计算库方法；各处理步骤提供可调参数与参数说明。' : 'These methods use V1-derived implementations or the same scientific-library methods as V1. Each processing step includes adjustable parameters and a parameter guide.'}
       </p>
       {['denoise', 'baseline'].map(group => (
         <div key={group} className="space-y-3">
