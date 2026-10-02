@@ -9,6 +9,9 @@ import io
 import re
 import uuid
 import zipfile
+import asyncio
+import time
+from threading import RLock
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,11 +20,9 @@ import pandas as pd
 import pywt
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel, Field
-from scipy import sparse
-from scipy.signal import savgol_filter
-from scipy.sparse.linalg import spsolve
+from algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
 
 
 ROOT = Path(__file__).resolve().parent
@@ -29,7 +30,7 @@ SAMPLES = ROOT / "samples"
 
 app = FastAPI(
     title="RamanCloud Preprocessing API",
-    version="2.0.0",
+    version="2.1.0",
     description="Cut, denoise, and baseline-correct Raman spectra and spectral cubes.",
 )
 app.add_middleware(
@@ -62,6 +63,15 @@ class CubePayload(BaseModel):
     steps: List[Step] = Field(default_factory=list)
 
 
+class BatchSpectrum(SpectrumPayload):
+    filename: str = 'spectrum.txt'
+
+
+class BatchPayload(BaseModel):
+    spectra: List[BatchSpectrum]
+    steps: List[Step] = Field(default_factory=list)
+
+
 class DownloadPayload(BaseModel):
     wavenumber: List[float]
     intensity: Optional[List[float]] = None
@@ -88,13 +98,67 @@ DEMO_MAPPING = {
 }
 
 DATASETS: Dict[str, Dict[str, Any]] = {}
+DATASET_LOCK = RLock()
+DATASET_TTL_SECONDS = 1800
+DATASET_MAX_BYTES = 1024 * 1024 * 1024
+
+
+@app.exception_handler(ValueError)
+async def parameter_error(request, error):
+    return JSONResponse(status_code=400, content={'detail': str(error)})
+
+
+def purge_datasets():
+    with DATASET_LOCK:
+        now = time.monotonic()
+        for key in list(DATASETS):
+            if now - DATASETS[key]['last_access'] >= DATASET_TTL_SECONDS:
+                del DATASETS[key]
+
+
+def get_dataset(dataset_id):
+    purge_datasets()
+    with DATASET_LOCK:
+        if dataset_id not in DATASETS:
+            raise HTTPException(status_code=404, detail='Dataset not found or expired. Please reload your file.')
+        DATASETS[dataset_id]['last_access'] = time.monotonic()
+        return DATASETS[dataset_id]
+
+
+@app.on_event('startup')
+async def start_cleanup():
+    async def cleanup():
+        while True:
+            await asyncio.sleep(60)
+            purge_datasets()
+    app.state.cleanup_task = asyncio.create_task(cleanup())
+
+
+@app.on_event('shutdown')
+async def stop_cleanup():
+    task = getattr(app.state, 'cleanup_task', None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+@app.delete('/api/datasets/{dataset_id}')
+def delete_dataset(dataset_id: str):
+    with DATASET_LOCK:
+        DATASETS.pop(dataset_id, None)
+    return {'code': 0, 'msg': 'Dataset released'}
 
 
 def clean_floats(values: Any) -> np.ndarray:
     arr = np.asarray(values, dtype=float)
     if arr.size == 0:
         raise ValueError("empty numeric array")
-    return np.nan_to_num(arr, copy=False)
+    if not np.isfinite(arr).all():
+        raise ValueError('Numeric data must be finite')
+    return arr
 
 
 def read_spectrum(content: bytes) -> Tuple[np.ndarray, np.ndarray]:
@@ -352,115 +416,23 @@ def attachment_response(content: bytes, filename: str, media_type: str = "text/p
     return Response(content=content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{quoted}"'})
 
 
-def normalize_window(window: int, order: int, length: int) -> int:
-    window = max(3, int(window))
-    if window % 2 == 0:
-        window += 1
-    if window >= length:
-        window = length - 1 if (length - 1) % 2 else length - 2
-    if window <= order:
-        window = order + 2 + ((order + 2) % 2 == 0)
-    if window >= length:
-        raise ValueError("Savitzky-Golay window is too large for the selected range.")
-    return window
-
-
 def denoise_spectrum(y: np.ndarray, params: Dict[str, Any], method: str) -> np.ndarray:
-    if method in ("skip", "", None):
-        return y.copy()
-    if method in ("sg", "savitzky_golay"):
-        order = int(params.get("order", 3))
-        window = normalize_window(int(params.get("window_size", 7)), order, len(y))
-        return savgol_filter(y, window, order)
-    if method == "wtd":
-        wavelet = params.get("wavelet", "db3")
-        level = int(params.get("level", 3))
-        max_level = pywt.dwt_max_level(len(y), pywt.Wavelet(wavelet).dec_len)
-        level = max(1, min(level, max_level))
-        coeffs = pywt.wavedec(y, wavelet, level=level)
-        sigma = np.median(np.abs(coeffs[-1])) / 0.6745 if len(coeffs[-1]) else 0
-        threshold = 0.8 * np.sqrt(2 * np.log(max(len(y), 2))) * sigma
-        coeffs = [c if i == 0 else pywt.threshold(c, threshold, mode="soft") for i, c in enumerate(coeffs)]
-        return pywt.waverec(coeffs, wavelet)[: len(y)]
-    if method == "tsvd":
-        matrix = y.reshape(1, -1)
-        return denoise_matrix(matrix, params, method)[0]
-    if method == "peer":
-        loops = int(params.get("loops", 3))
-        window = normalize_window(2 * int(params.get("half_k_threshold", 2)) + 3, 2, len(y))
-        out = y.copy()
-        for _ in range(max(1, loops)):
-            smooth = savgol_filter(out, window, 2)
-            residual = out - smooth
-            keep = np.abs(residual) > np.percentile(np.abs(residual), 85)
-            out = np.where(keep, out, smooth)
-        return out
-    raise ValueError(f"Unknown denoise method: {method}")
-
-
-def whittaker_baseline(y: np.ndarray, lam: float = 1e7, diff_order: int = 2, p: float = 0.01, niter: int = 15) -> np.ndarray:
-    length = len(y)
-    diff_order = max(1, min(int(diff_order), 3))
-    dmat = sparse.eye(length, format="csc")
-    for _ in range(diff_order):
-        dmat = dmat[1:] - dmat[:-1]
-    weights = np.ones(length)
-    for _ in range(max(1, int(niter))):
-        wmat = sparse.diags(weights, 0, shape=(length, length), format="csc")
-        baseline = spsolve(wmat + float(lam) * (dmat.T @ dmat), weights * y)
-        weights = p * (y > baseline) + (1 - p) * (y <= baseline)
-    return baseline
-
-
-def rolling_min_baseline(y: np.ndarray, half_window: int = 40) -> np.ndarray:
-    half = max(2, int(half_window))
-    series = pd.Series(y)
-    base = series.rolling(2 * half + 1, center=True, min_periods=1).min()
-    base = base.rolling(2 * half + 1, center=True, min_periods=1).mean()
-    return base.values.astype(float)
-
-
-def polynomial_baseline(y: np.ndarray, order: int = 3, quantile: float = 0.35) -> np.ndarray:
-    x = np.linspace(-1, 1, len(y))
-    mask = np.ones(len(y), dtype=bool)
-    order = max(1, min(int(order), 5))
-    for _ in range(8):
-        coeff = np.polyfit(x[mask], y[mask], order)
-        base = np.polyval(coeff, x)
-        residual = y - base
-        mask = residual <= np.quantile(residual, quantile)
-        if mask.sum() <= order + 1:
-            break
-    return base
+    return denoise(y, params, method)
 
 
 def baseline_correct(y: np.ndarray, params: Dict[str, Any], method: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-    if method in ("skip", "", None):
-        return y.copy(), None
-    if method in ("airpls", "aspls", "aabs", "irsqr"):
-        lam = float(params.get("lam", params.get("lambda_", 1e7)))
-        order = int(params.get("diff_order", params.get("order_", 2)))
-        p = float(params.get("quantile", 0.01))
-        baseline = whittaker_baseline(y, lam=lam, diff_order=order, p=max(0.001, min(p, 0.49)))
-    elif method in ("imodpoly", "penalizedpoly", "airpls_old"):
-        baseline = polynomial_baseline(y, int(params.get("poly_order", params.get("order_", 3))))
-    elif method in ("rollingball", "mormol", "snip"):
-        baseline = rolling_min_baseline(y, int(params.get("half_window", params.get("max_half_window", 40))))
-    else:
-        raise ValueError(f"Unknown baseline method: {method}")
-    return y - baseline, baseline
+    return correct_baseline(y, params, method)
 
 
 def denoise_matrix(matrix: np.ndarray, params: Dict[str, Any], method: str) -> np.ndarray:
-    if method == "tsvd":
-        threshold = float(params.get("threshold", 1e-3))
-        u, s, vh = np.linalg.svd(matrix, full_matrices=False)
-        keep = max(1, int(np.sum((s / max(s[0], 1e-12)) > threshold)))
-        return (u[:, :keep] * s[:keep]) @ vh[:keep]
-    return np.vstack([denoise_spectrum(row, params, method) for row in matrix])
+    return denoise_batch(matrix, params, method)
 
 
 def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], List[Dict[str, Any]]]:
+    if wavenumber.ndim != 1 or data.ndim not in (1, 2) or data.shape[-1] != len(wavenumber):
+        raise ValueError('Spectral data must match the one-dimensional wavenumber axis')
+    if not len(wavenumber) or not np.isfinite(wavenumber).all() or not np.isfinite(data).all():
+        raise ValueError('Spectral values must be finite and non-empty')
     current_wn = wavenumber.copy()
     current = data.copy()
     baseline = None
@@ -475,16 +447,25 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
         if step.type == "cut":
             start = float(params.get("start", current_wn.min()))
             end = float(params.get("end", current_wn.max()))
+            if not np.isfinite([start, end]).all():
+                raise ValueError('Cut boundaries must be finite')
             mask = (current_wn >= min(start, end)) & (current_wn <= max(start, end))
             if not mask.any():
                 raise ValueError("Cut range does not overlap with the wavenumber axis.")
             current_wn = current_wn[mask]
             current = current[:, mask]
+            if baseline is not None:
+                baseline = baseline[:, mask]
             history.append({"type": "cut", "range": [min(start, end), max(start, end)]})
         elif step.type == "denoise":
-            current = denoise_matrix(current, params, step.method)
-            history.append({"type": "denoise", "method": step.method, "params": params})
+            method = 'sg' if step.method == 'savitzky_golay' else step.method
+            if method == 'tsvd' and is_vector:
+                raise ValueError('TSVD requires a batch or hyperspectral dataset, not a single spectrum')
+            params = validated_parameters(method, params)
+            current = denoise_matrix(current, params, method)
+            history.append({"type": "denoise", "method": method, "params": params})
         elif step.type == "baseline":
+            params = validated_parameters(step.method, params)
             corrected = []
             baselines = []
             for row in current:
@@ -493,21 +474,36 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
                 if row_baseline is not None:
                     baselines.append(row_baseline)
             current = np.vstack(corrected)
-            baseline = np.vstack(baselines) if baselines else None
+            if baselines:
+                removed = np.vstack(baselines)
+                baseline = removed if baseline is None else baseline + removed
             history.append({"type": "baseline", "method": step.method, "params": params})
+        else:
+            raise ValueError('Unknown pipeline step: ' + step.type)
+        if not np.isfinite(current).all() or (baseline is not None and not np.isfinite(baseline).all()):
+            raise ValueError('Algorithm produced non-finite values; adjust its parameters')
 
     return current_wn, current[0] if is_vector else current, (baseline[0] if is_vector and baseline is not None else baseline), history
 
 
 def register_dataset(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str, coordinates: Optional[Dict[str, Any]] = None) -> str:
     dataset_id = uuid.uuid4().hex
-    DATASETS[dataset_id] = {
+    dataset = {
         "wavenumber": np.asarray(wavenumber, dtype=float),
         "data": np.asarray(data, dtype=float),
         "mode": mode,
         "filename": filename,
         "coordinates": coordinates or {},
+        "last_access": time.monotonic(),
     }
+    purge_datasets()
+    with DATASET_LOCK:
+        if dataset['data'].nbytes > DATASET_MAX_BYTES:
+            raise ValueError('Dataset exceeds the in-memory size limit')
+        while DATASETS and sum(d['data'].nbytes for d in DATASETS.values()) + dataset['data'].nbytes > DATASET_MAX_BYTES:
+            oldest = min(DATASETS, key=lambda key: DATASETS[key]['last_access'])
+            del DATASETS[oldest]
+        DATASETS[dataset_id] = dataset
     return dataset_id
 
 
@@ -567,8 +563,10 @@ def health() -> Dict[str, Any]:
         "msg": "RamanCloud preprocessing API is running",
         "data": {
             "framework": "FastAPI",
-            "denoise": ["sg", "wtd", "peer", "tsvd", "skip"],
-            "baseline": ["airpls", "aspls", "aabs", "imodpoly", "penalizedpoly", "rollingball", "mormol", "snip", "irsqr", "skip"],
+            "denoise": list(DENOISE_METHODS),
+            "baseline": list(BASELINE_METHODS),
+            "algorithm_version": "2.1.0",
+            "dataset_idle_seconds": DATASET_TTL_SECONDS,
             "spectra_demos": list(DEMO_SPECTRA),
             "mapping_demos": list(DEMO_MAPPING),
         },
@@ -681,12 +679,35 @@ def process_spectrum(payload: SpectrumPayload) -> Dict[str, Any]:
     }
 
 
+@app.post('/api/process-batch')
+def process_batch(payload: BatchPayload):
+    if not 1 <= len(payload.spectra) <= 100:
+        raise ValueError('Batch processing accepts 1 to 100 spectra')
+    results = []
+    if any(step.method == 'tsvd' and step.type == 'denoise' for step in payload.steps):
+        wave = clean_floats(payload.spectra[0].wavenumber)
+        if any(not np.array_equal(wave, clean_floats(item.wavenumber)) for item in payload.spectra):
+            raise ValueError('TSVD requires identical wavenumber axes across all spectra')
+        matrix = clean_floats([item.intensity for item in payload.spectra])
+        out_wave, out, baseline, history = apply_pipeline(wave, matrix, payload.steps)
+        for index, item in enumerate(payload.spectra):
+            results.append({'filename': item.filename, 'wavenumber': out_wave.tolist(),
+                            'intensity': out[index].tolist(), 'history': history,
+                            'baseline': baseline[index].tolist() if baseline is not None else None})
+        return {'code': 0, 'msg': 'Batch pipeline completed', 'data': {'spectra': results}}
+    for spectrum in payload.spectra:
+        try:
+            result = process_spectrum(SpectrumPayload(wavenumber=spectrum.wavenumber, intensity=spectrum.intensity, steps=payload.steps))['data']
+        except ValueError as error:
+            raise ValueError(spectrum.filename + ': ' + str(error))
+        results.append(dict(result, filename=spectrum.filename))
+    return {'code': 0, 'msg': 'Batch pipeline completed', 'data': {'spectra': results}}
+
+
 @app.post("/api/process-hyperspectral")
 def process_cube(payload: CubePayload) -> Dict[str, Any]:
     if payload.dataset_id:
-        if payload.dataset_id not in DATASETS:
-            raise HTTPException(status_code=404, detail="Dataset not found or expired.")
-        source = DATASETS[payload.dataset_id]
+        source = get_dataset(payload.dataset_id)
         wave = source["wavenumber"]
         source_data = source["data"]
         mode = source["mode"]
@@ -726,14 +747,14 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
     }
     if baseline is not None:
         response["baseline_mean"] = rounded_list(baseline.mean(axis=0))
+        baseline_cube = baseline.reshape(processed_cube.shape)
+        response['baseline_dataset_id'] = register_dataset(out_wave, baseline_cube, mode, 'baseline_' + filename, coordinates)
     return {"code": 0, "msg": "Mapping pipeline completed", "data": response}
 
 
 @app.get("/api/hyperspectral-slice/{dataset_id}")
 def get_hyperspectral_slice(dataset_id: str, wavenumber_value: Optional[float] = None) -> Dict[str, Any]:
-    if dataset_id not in DATASETS:
-        raise HTTPException(status_code=404, detail="Dataset not found or expired.")
-    dataset = DATASETS[dataset_id]
+    dataset = get_dataset(dataset_id)
     preview, preview_wn, preview_idx, preview_scale = heatmap_slice(dataset["wavenumber"], dataset["data"], wavenumber_value)
     return {
         "code": 0,
@@ -749,9 +770,7 @@ def get_hyperspectral_slice(dataset_id: str, wavenumber_value: Optional[float] =
 
 @app.get("/api/hyperspectral-pixel/{dataset_id}")
 def get_hyperspectral_pixel(dataset_id: str, x: int = 0, y: int = 0) -> Dict[str, Any]:
-    if dataset_id not in DATASETS:
-        raise HTTPException(status_code=404, detail="Dataset not found or expired.")
-    dataset = DATASETS[dataset_id]
+    dataset = get_dataset(dataset_id)
     data = dataset["data"]
     if data.ndim != 3:
         raise HTTPException(status_code=400, detail="Pixel spectra are only available for imaging datasets.")
@@ -773,9 +792,7 @@ def get_hyperspectral_pixel(dataset_id: str, x: int = 0, y: int = 0) -> Dict[str
 
 @app.get("/api/hyperspectral-spectrum/{dataset_id}")
 def get_hyperspectral_spectrum(dataset_id: str, index: int = 0) -> Dict[str, Any]:
-    if dataset_id not in DATASETS:
-        raise HTTPException(status_code=404, detail="Dataset not found or expired.")
-    dataset = DATASETS[dataset_id]
+    dataset = get_dataset(dataset_id)
     data = dataset["data"]
     if data.ndim != 2:
         raise HTTPException(status_code=400, detail="Indexed spectra are only available for time-series datasets.")
@@ -796,9 +813,7 @@ def get_hyperspectral_spectrum(dataset_id: str, index: int = 0) -> Dict[str, Any
 def download(payload: DownloadPayload) -> Response:
     filename = payload.filename or "processed.txt"
     if payload.dataset_id is not None:
-        if payload.dataset_id not in DATASETS:
-            raise HTTPException(status_code=404, detail="Dataset not found or expired.")
-        dataset = DATASETS[payload.dataset_id]
+        dataset = get_dataset(payload.dataset_id)
         wave = dataset["wavenumber"]
         data = dataset["data"]
         spectra = data.reshape(-1, data.shape[-1]) if data.ndim == 3 else data

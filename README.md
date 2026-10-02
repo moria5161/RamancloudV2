@@ -11,6 +11,7 @@ An online workspace for Raman spectral preprocessing.
 - Compare raw and processed data through spectra and heatmaps, and inspect individual spatial pixels or time points.
 - Switch between uploaded spectra and inspect time-series changes in a difference heatmap.
 - Download processed data with optional processing records, split or merge spectral files, and convert between supported instrument formats.
+- Apply one pipeline to multiple uploaded spectra, export batch results, or download baselines separately.
 - Switch between English and Chinese, with light and dark themes.
 
 ## Workflow

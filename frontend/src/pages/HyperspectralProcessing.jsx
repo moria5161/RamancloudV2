@@ -65,6 +65,10 @@ export default function HyperspectralProcessing() {
 
   const showError = msg => setError(msg);
 
+  const releaseDatasets = ids => {
+    ids.filter(Boolean).forEach(id => axios.delete(`${API_BASE}/api/datasets/${id}`).catch(() => {}));
+  };
+
   const clearSelections = () => {
     setSelectedPixel(null);
     setRawPixelSpectrum(null);
@@ -76,6 +80,7 @@ export default function HyperspectralProcessing() {
   };
 
   const applyData = (data, demo = '', instrument = 'Horiba') => {
+    releaseDatasets([rawData?.dataset_id, processedData?.processed_dataset_id, processedData?.baseline_dataset_id]);
     clearSelections();
     setRawData({ ...data, instrument });
     setMode(data.mode);
@@ -144,6 +149,7 @@ export default function HyperspectralProcessing() {
           setSelectedWN(value);
         }
         setProcessedMean({ wavenumber: res.data.wavenumber, intensity: res.data.mean_spectrum });
+        releaseDatasets([processedData?.processed_dataset_id, processedData?.baseline_dataset_id]);
         setProcessedData(res.data);
         setRunRecord(createProcessingRecord(fileName, mode, rawData, res.data, steps, started));
         setProcessedPixelSpectrum(null);
@@ -152,18 +158,18 @@ export default function HyperspectralProcessing() {
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = (baseline = false) => {
     if (!processedData || isStale || task.busy) return;
     task.run('preparingDownload', async () => {
-      const filename = `processed_${fileName || 'hyperspectral.txt'}`;
+      const filename = `${baseline ? 'baseline' : 'processed'}_${fileName || 'hyperspectral.txt'}`;
       const { data } = await axios.post(`${API_BASE}/api/download`, {
         wavenumber: processedData.wavenumber,
-        dataset_id: processedData.processed_dataset_id,
+        dataset_id: baseline ? processedData.baseline_dataset_id : processedData.processed_dataset_id,
         shape: processedData.shape, mode, filename,
         format: 'mapping',
       }, { responseType: 'blob' });
       await exportResult(data, filename, {
-        ...runRecord, instrument: rawData.instrument,
+        ...runRecord, data_kind: baseline ? 'baseline' : 'processed', instrument: rawData.instrument,
         coordinates: rawData.coordinates,
         export_instrument: 'Horiba',
         data_format: mode === 'imaging' ? 'Horiba tab-separated mapping: first row has two empty cells followed by wavenumbers; subsequent rows contain X, Y, intensities.' : 'Horiba tab-separated time series: first row has one empty cell followed by wavenumbers; subsequent rows contain original time/index and intensities.',
@@ -173,6 +179,7 @@ export default function HyperspectralProcessing() {
   };
 
   const handleReset = () => {
+    releaseDatasets([processedData?.processed_dataset_id, processedData?.baseline_dataset_id]);
     sliceVersion.current += 1;
     clearTimeout(sliceTimerRef.current);
     setProcessedMean(null);
@@ -185,6 +192,7 @@ export default function HyperspectralProcessing() {
   };
 
   const handleClear = () => {
+    releaseDatasets([rawData?.dataset_id]);
     handleReset();
     clearSelections();
     setRawData(null);
@@ -564,7 +572,9 @@ export default function HyperspectralProcessing() {
       <ControlDock>
         <ControlPanel
           steps={steps} onStepsChange={setSteps}
-          onProcess={handleProcess} onDownload={handleDownload} onReset={handleReset}
+          onProcess={handleProcess} onDownload={() => handleDownload()} onReset={handleReset}
+          allowBatch={true} hasBaseline={!!processedData?.baseline_dataset_id}
+          onDownloadBaseline={() => handleDownload(true)}
           isProcessing={isProcessing} fileName={fileName} demoName={demoName}
           hasData={hasData} busy={task.busy} hasResult={!!runRecord} isStale={isStale}
           elapsed={runRecord?.elapsed_seconds} includeRecord={includeRecord}

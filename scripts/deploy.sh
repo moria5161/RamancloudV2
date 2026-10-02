@@ -10,6 +10,9 @@ cd "$APP_DIR"
 
 git pull --ff-only
 
+python3.11 -m venv "$APP_DIR/backend/.venv"
+"$APP_DIR/backend/.venv/bin/python" -m pip install -r "$APP_DIR/backend/requirements.txt"
+
 cd "$APP_DIR/frontend"
 npm ci
 npm run build

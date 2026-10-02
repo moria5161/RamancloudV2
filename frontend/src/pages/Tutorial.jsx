@@ -76,22 +76,22 @@ export default function Tutorial() {
             <div className="bg-black/20 rounded-lg p-3">
               <h4 className="text-sm font-medium text-gray-300">Savitzky-Golay (SG)</h4>
               <p className="text-xs text-gray-500 mt-1">
-                {isZh ? 'Window Size：控制平滑窗口，越大越平滑，必须为奇数且大于 order+1。' : 'Window Size: Controls the smoothing window. Larger = smoother. Must be odd and greater than order+1.'}<br />
+                {isZh ? '窗口大小：越大通常越平滑；必须为奇数、大于多项式阶数且不超过光谱长度。' : 'Window size: larger usually means smoother. Must be odd, greater than polynomial order, and no longer than the spectrum.'}<br />
                 {isZh ? 'Order：拟合多项式阶数，越高拟合越灵活。' : 'Order: Polynomial order for fitting. Higher = more flexible fit.'}
               </p>
             </div>
             <div className="bg-black/20 rounded-lg p-3">
               <h4 className="text-sm font-medium text-gray-300">Wavelet (WTD)</h4>
               <p className="text-xs text-gray-500 mt-1">
-                {isZh ? 'Wavelet：Daubechies 小波类型（db1-db8）。Level：分解层数，层数越高通常去除噪声越多。' : 'Wavelet: Daubechies wavelet type (db1-db8). Level: Decomposition depth. Higher level removes more noise.'}
+                {isZh ? '小波类型：db1-db9。分解层数决定参与阈值处理的尺度；最大可用层数取决于光谱长度和小波类型，超过时会提示错误。' : 'Wavelet: db1-db9. Level selects the decomposition scales. The maximum level depends on spectrum length and wavelet type; excessive levels are rejected.'}
               </p>
             </div>
             <div className="bg-black/20 rounded-lg p-3">
               <h4 className="text-sm font-medium text-gray-300">PEER</h4>
               <p className="text-xs text-gray-500 mt-1">
                 {isZh
-                  ? 'Peak Extraction and Retention 算法。Loops：迭代次数（1-10）。Peak Seek：寻峰阈值，数值越高通常保留更多峰。'
-                  : 'Peak Extraction and Retention algorithm. Loops: iteration count (1-10). Peak Seek: threshold for peak identification. Higher values retain more peaks.'}{' '}
+                  ? '沿用 V1 的 PEER 算法。迭代次数为 1-20；寻峰阈值为 0-7，改变峰识别与保留结果。建议结合处理前后曲线判断参数。'
+                  : 'Uses V1 PEER. Loops: 1-20; peak threshold: 0-7. Compare raw and processed curves when tuning peak detection and retention.'}{' '}
                 <a href="https://pubs.acs.org/doi/10.1021/acs.analchem.0c05391" target="_blank" rel="noopener noreferrer" className="text-indigo-400">{isZh ? '参考文献' : 'Reference'}</a>
               </p>
             </div>
@@ -146,6 +146,13 @@ export default function Tutorial() {
           </div>
         </div>
         <AlgorithmReferences />
+        <Section id="batch-and-export" title={isZh ? '批量处理与基线导出' : 'Batch Processing and Baseline Export'}>
+          <p>{isZh ? '上传多条单光谱后，可以选择将同一流程应用到全部文件，并下载包含各条结果及独立基线的 ZIP。TSVD 仅用于波数轴完全一致的批量光谱或高光谱数据。基线校正后，单光谱和高光谱均可单独下载基线。' : 'Upload multiple spectra, apply one pipeline to all files, and download their results and separate baselines in a ZIP. TSVD requires identical wavenumber axes in a batch, or a hyperspectral dataset. Baselines can also be downloaded separately for spectra and hyperspectral data.'}</p>
+        </Section>
+        <Section id="data-retention" title={isZh ? '数据与隐私' : 'Data and Privacy'}>
+          <p>{isZh ? '上传文件用于当前计算，不保存为永久数据集，不用于模型训练。上传过程中可能使用框架的临时文件缓冲。单光谱结果保留在当前浏览器页面；高光谱缓存在服务器内存中，闲置 30 分钟后清理（检查间隔约 1 分钟），也可能因内存限制或服务重启提前清理。请及时下载需要保留的结果。' : 'Uploads are used for the current computation, not stored as permanent datasets or used for model training. The upload framework may use temporary file buffers. Spectrum results remain in the current browser page; hyperspectral datasets are cached in server memory and removed after 30 minutes idle (checked about once a minute), or earlier under memory pressure or a service restart. Download results you need to keep.'}</p>
+          <p>{isZh ? '浏览器本地保存语言和主题偏好，不保存光谱数据。访问统计与服务器访问日志可能记录访问事件、IP 地址和请求路径，请勿在文件名中包含敏感信息。' : 'Local browser storage retains language and theme preferences, not spectral data. Visit statistics and server access logs may record visit events, IP addresses, and request paths. Avoid sensitive information in filenames.'}</p>
+        </Section>
       </div>
     </div>
   );

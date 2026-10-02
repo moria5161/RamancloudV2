@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=room
 WorkingDirectory=/media/ramancloud_rebuild/backend
-ExecStart=/home/room/intel/intelpython3/bin/python app.py
+ExecStart=/media/ramancloud_rebuild/backend/.venv/bin/python app.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
