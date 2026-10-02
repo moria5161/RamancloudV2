@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Upload, Image, Activity, Crosshair, Map } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
 import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap, TimeSeriesDifference } from '../components/HyperspectralChart';
@@ -31,7 +31,6 @@ export default function HyperspectralProcessing() {
   const [steps, setSteps] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [cutRange, setCutRange] = useState(null);
   const [activeTab, setActiveTab] = useState('imaging');
   const [selectedWN, setSelectedWN] = useState(null);
   const [selectedPixel, setSelectedPixel] = useState(null); // {x, y}
@@ -52,18 +51,11 @@ export default function HyperspectralProcessing() {
   const [sharedColorScale, setSharedColorScale] = useState(true);
   const isStale = !!runRecord && pipelineSignature(steps) !== JSON.stringify(runRecord.steps);
 
-  const handleStepsChange = nextSteps => {
-    setSteps(nextSteps);
-    const cut = nextSteps.find(step => step.type === 'cut');
-    if (cut) setCutRange([cut.params.start, cut.params.end]);
-  };
-
-  const handleCutRangeChange = range => {
-    setCutRange(range);
-    setSteps(previous => previous.map(step => step.type === 'cut'
-      ? { ...step, params: { ...step.params, start: range[0], end: range[1] } }
-      : step));
-  };
+  const cutRange = useMemo(() => {
+    const cut = steps.find(step => step.type === 'cut');
+    if (cut) return [cut.params.start, cut.params.end];
+    return rawData ? [Math.min(...rawData.wavenumber), Math.max(...rawData.wavenumber)] : null;
+  }, [steps, rawData?.wavenumber]);
 
   const hasData = rawData !== null;
   const isImaging = mode === 'imaging';
@@ -92,7 +84,6 @@ export default function HyperspectralProcessing() {
     setProcessedData(null);
     setRunRecord(null);
     setSelectedSeriesIndex(data.mode === 'time_series' ? 0 : null);
-    setCutRange([Math.min(...data.wavenumber), Math.max(...data.wavenumber)]);
     setSelectedWN(data.preview_wavenumber ?? data.wavenumber[Math.floor(data.wavenumber.length / 2)]);
     setSteps([]);
     setActiveTab('imaging');
@@ -201,7 +192,6 @@ export default function HyperspectralProcessing() {
     setMode(null);
     setSelectedWN(null);
     setSelectedSeriesIndex(null);
-    setCutRange(null);
     setError(null);
     task.setError(null);
   };
@@ -569,14 +559,14 @@ export default function HyperspectralProcessing() {
       {/* Right: Control Panel */}
       <ControlDock>
         <ControlPanel
-          steps={steps} onStepsChange={handleStepsChange}
+          steps={steps} onStepsChange={setSteps}
           onProcess={handleProcess} onDownload={handleDownload} onReset={handleReset}
           isProcessing={isProcessing} fileName={fileName} demoName={demoName}
           hasData={hasData} busy={task.busy} hasResult={!!runRecord} isStale={isStale}
           elapsed={runRecord?.elapsed_seconds} includeRecord={includeRecord}
           onIncludeRecordChange={setIncludeRecord} onClear={handleClear}
           onDemoChange={loadDemo} demos={DEMOS}
-          cutRange={cutRange} onCutRangeChange={handleCutRangeChange}
+          cutRange={cutRange}
         />
       </ControlDock>
 

@@ -54,8 +54,8 @@ export default function Tutorial() {
           </div>
           <p className="text-sm text-gray-400">
             {isZh
-              ? '选择波数范围来裁剪光谱。你可以使用控制面板中的快速裁剪范围，也可以在流程中添加 Cut 步骤并设置起止值。裁剪区域会在图中高亮显示。'
-              : 'Select a wavenumber range to crop your spectrum. Use the Quick Cut Range inputs in the control panel or add a Cut step to your pipeline with custom start/end values. The cut region is highlighted on the chart.'}
+              ? '在处理流程中添加裁剪步骤，并设置起止波数。光谱图中的边界线会标出所选范围。'
+              : 'Add a Cut step to your pipeline and set its start/end wavenumbers. Boundary lines mark the selected range on the spectrum.'}
           </p>
           <div className="bg-black/20 rounded-lg p-3 text-xs text-gray-500 font-mono">
             {isZh ? '提示：拖拽图表可缩放，双击可重置视图；也可以使用图表工具栏进行平移和缩放。' : 'Tip: Drag on the chart to zoom, double-click to reset view. Use the mode bar for pan/zoom tools.'}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Upload, FileUp } from 'lucide-react';
 import SpectralChart, { CompareChart } from '../components/SpectralChart';
 import ControlPanel from '../components/ControlPanel';
@@ -19,7 +19,6 @@ export default function SpectralProcessing() {
   const [rawData, setRawData] = useState(null);
   const [processedData, setProcessedData] = useState(null);
   const [baselineData, setBaselineData] = useState(null);
-  const [cutRange, setCutRange] = useState(null);
   const [steps, setSteps] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -30,6 +29,11 @@ export default function SpectralProcessing() {
   const [includeRecord, setIncludeRecord] = useState(true);
   const [uploadedSpectra, setUploadedSpectra] = useState([]);
   const [selectedSpectrum, setSelectedSpectrum] = useState(0);
+  const cutRange = useMemo(() => {
+    const cut = steps.find(step => step.type === 'cut');
+    if (cut) return [cut.params.start, cut.params.end];
+    return rawData ? [Math.min(...rawData.wavenumber), Math.max(...rawData.wavenumber)] : null;
+  }, [steps, rawData?.wavenumber]);
   const isStale = !!runRecord && pipelineSignature(steps) !== JSON.stringify(runRecord.steps);
 
   const applyData = (data, source, demo = '') => {
@@ -41,7 +45,6 @@ export default function SpectralProcessing() {
     setDemoName(demo);
     setSteps([]);
     setViewMode('overlay');
-    setCutRange([Math.min(...data.wavenumber), Math.max(...data.wavenumber)]);
   };
 
   const loadDemo = name => {
@@ -116,24 +119,10 @@ export default function SpectralProcessing() {
     setRawData(null);
     setFileName(null);
     setDemoName('');
-    setCutRange(null);
     setError(null);
     task.setError(null);
     setUploadedSpectra([]);
     setSelectedSpectrum(0);
-  };
-
-  const handleStepsChange = nextSteps => {
-    setSteps(nextSteps);
-    const cut = nextSteps.find(step => step.type === 'cut');
-    if (cut) setCutRange([cut.params.start, cut.params.end]);
-  };
-
-  const handleCutRangeChange = range => {
-    setCutRange(range);
-    setSteps(previous => previous.map(step => step.type === 'cut'
-      ? { ...step, params: { ...step.params, start: range[0], end: range[1] } }
-      : step));
   };
 
   const hasData = rawData !== null;
@@ -212,7 +201,7 @@ export default function SpectralProcessing() {
       {/* Right: Control Panel */}
       <ControlDock>
         <ControlPanel
-          steps={steps} onStepsChange={handleStepsChange}
+          steps={steps} onStepsChange={setSteps}
           onProcess={handleProcess} onDownload={handleDownload} onReset={handleReset}
           isProcessing={isProcessing} fileName={fileName} demoName={demoName}
           hasData={hasData} busy={task.busy} hasResult={!!runRecord} isStale={isStale}
@@ -227,7 +216,7 @@ export default function SpectralProcessing() {
             setError(null);
             applyData(uploadedSpectra[index], uploadedSpectra[index].filename);
           }}
-          cutRange={cutRange} onCutRangeChange={handleCutRangeChange}
+          cutRange={cutRange}
         />
       </ControlDock>
 
