@@ -22,6 +22,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel, Field
+from visit_statistics import router as visit_statistics_router
 from algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
 
 
@@ -40,6 +41,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(visit_statistics_router)
 
 
 class Step(BaseModel):

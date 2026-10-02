@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily RamanCloud visit statistics backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=ramancloud-analytics-backup.service
+
+[Install]
+WantedBy=timers.target

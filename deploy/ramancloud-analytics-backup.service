@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up RamanCloud local visit statistics
+
+[Service]
+Type=oneshot
+User=room
+WorkingDirectory=/media/ramancloud_rebuild/backend
+ExecStart=/media/ramancloud_rebuild/backend/.venv/bin/python backup_visits.py
+UMask=0077

@@ -7,3 +7,4 @@ pandas
 scipy
 PyWavelets
 pybaselines==1.2.1
+maxminddb>=2.6,<4
