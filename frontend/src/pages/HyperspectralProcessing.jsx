@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, Image, Activity, Crosshair, Map } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
-import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap } from '../components/HyperspectralChart';
+import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap, TimeSeriesDifference } from '../components/HyperspectralChart';
 import ControlPanel from '../components/ControlPanel';
 import ControlDock from '../components/ControlDock';
 import axios from 'axios';
@@ -167,11 +167,14 @@ export default function HyperspectralProcessing() {
         wavenumber: processedData.wavenumber,
         dataset_id: processedData.processed_dataset_id,
         shape: processedData.shape, mode, filename,
+        format: 'mapping',
       }, { responseType: 'blob' });
       await exportResult(data, filename, {
         ...runRecord, instrument: demoName ? 'Horiba' : uploadInstrument,
-        columns: 'wavenumber, then one intensity column per spectrum',
-        spatial_order: mode === 'imaging' ? 'row-major (Y, X); X varies fastest' : 'time index ascending',
+        coordinates: rawData.coordinates,
+        export_instrument: 'Horiba',
+        data_format: mode === 'imaging' ? 'Horiba tab-separated mapping: first row has two empty cells followed by wavenumbers; subsequent rows contain X, Y, intensities.' : 'Horiba tab-separated time series: first row has one empty cell followed by wavenumbers; subsequent rows contain original time/index and intensities.',
+        spatial_order: mode === 'imaging' ? 'row-major (Y, X); X varies fastest' : 'source time order',
       }, includeRecord);
     });
   };
@@ -185,6 +188,7 @@ export default function HyperspectralProcessing() {
     setProcessedPixelSpectrum(null);
     setProcessedSeriesSpectrum(null);
     setSteps([]);
+    if (activeTab === 'difference') setActiveTab('imaging');
   };
 
   const handleClear = () => {
@@ -206,14 +210,16 @@ export default function HyperspectralProcessing() {
     if (!event.points?.length) return;
     const pt = event.points[0];
     if (isTimeSeries) {
-      setSelectedSeriesIndex(Math.round(pt.y));
+      const times = rawData?.coordinates?.time;
+      const index = times?.length ? times.reduce((best, value, current) => Math.abs(value - pt.y) < Math.abs(times[best] - pt.y) ? current : best, 0) : Math.round(pt.y);
+      setSelectedSeriesIndex(index);
       setActiveTab('pixel');
       return;
     }
     const scale = rawData?.preview_scale || 1;
     setSelectedPixel({ x: Math.round(pt.x * scale), y: Math.round(pt.y * scale) });
     setActiveTab('pixel');
-  }, [rawData?.preview_scale, isTimeSeries]);
+  }, [rawData?.preview_scale, rawData?.coordinates, isTimeSeries]);
 
   const fetchSlice = useCallback(async (datasetId, value) => {
     if (!datasetId || value == null) return null;
@@ -319,6 +325,10 @@ export default function HyperspectralProcessing() {
                     <Icon className="w-3 h-3" /> {t(id === 'imaging' && isTimeSeries ? 'timeSeries' : labelKey)}
                   </button>
                 ))}
+                {isTimeSeries && processedData && <button onClick={() => setActiveTab('difference')}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-md transition-all ${activeTab === 'difference' ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-500 hover:text-gray-300'}`}>
+                  <Activity className="w-3 h-3" /> {t('differenceView')}
+                </button>}
               </div>
             )}
             <button disabled={task.busy} onClick={() => fileInputRef.current?.click()}
@@ -389,12 +399,22 @@ export default function HyperspectralProcessing() {
               )}
               {/* Tab content */}
               <div className="flex-1" style={{ height: window.innerHeight - 260 }}>
+                {activeTab === 'difference' && isTimeSeries && processedData && <TimeSeriesDifference
+                  rawData2D={rawData.preview} processedData2D={processedData.preview}
+                  rawWavenumber={rawData.wavenumber} processedWavenumber={processedData.wavenumber}
+                  timeCoordinates={rawData.coordinates?.time} timeKind={rawData.coordinates?.time_kind}
+                  timeUnit={rawData.coordinates?.time_unit}
+                  selectedIndex={selectedSeriesIndex} onHeatmapClick={handleHeatmapClick}
+                  height={window.innerHeight - 280}
+                />}
                 {/* Imaging Tab */}
                 {activeTab === 'imaging' && isImaging && rawData.preview && (
                   processedData?.preview ? (
                     <CompareImaging
                       rawPreview={rawData.preview}
                       processedPreview={processedData.preview}
+                      coordinates={rawData.coordinates}
+                      previewScale={rawData.preview_scale || 1}
                       wavenumber={rawData.wavenumber}
                       selectedWN={selectedWN}
                       onSelectWN={handleWavenumberChange}
@@ -407,6 +427,8 @@ export default function HyperspectralProcessing() {
                   ) : (
                     <ImagingHeatmap
                       previewData={rawData.preview}
+                      coordinates={rawData.coordinates}
+                      previewScale={rawData.preview_scale || 1}
                       wavenumber={rawData.wavenumber}
                       selectedWN={selectedWN}
                       onSelectWN={handleWavenumberChange}
@@ -427,6 +449,9 @@ export default function HyperspectralProcessing() {
                     <CompareTimeSeriesHeatmap
                       rawData2D={rawData.preview || rawData.mean_spectrum}
                       processedData2D={processedData.preview}
+                      timeCoordinates={rawData.coordinates?.time}
+                      timeKind={rawData.coordinates?.time_kind}
+                      timeUnit={rawData.coordinates?.time_unit}
                       rawWavenumber={rawData.wavenumber}
                       processedWavenumber={processedData.wavenumber}
                       title={t('rawProcessedComparison')}
@@ -448,6 +473,9 @@ export default function HyperspectralProcessing() {
                       selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
                       selectedIndex={selectedSeriesIndex}
                       sharedColorScale={sharedColorScale}
+                      timeCoordinates={rawData.coordinates?.time}
+                      timeKind={rawData.coordinates?.time_kind}
+                      timeUnit={rawData.coordinates?.time_unit}
                     />
                   )
                 )}
@@ -482,6 +510,7 @@ export default function HyperspectralProcessing() {
                       {!selectedPixel && (
                         <span className="text-xs text-gray-600 self-end">{t('selectPixelHint')}</span>
                       )}
+                      {selectedPixel && <span className="text-xs text-gray-500 self-end">{t('sourceCoordinates')}: ({rawData.coordinates?.x?.[selectedPixel.x] ?? selectedPixel.x}, {rawData.coordinates?.y?.[selectedPixel.y] ?? selectedPixel.y})</span>}
                     </div>
                     <PixelSpectrum
                       previewData={rawData.preview}
@@ -509,6 +538,7 @@ export default function HyperspectralProcessing() {
                       {selectedSeriesIndex == null && (
                         <span className="text-xs text-gray-600 self-end">{t('selectTimeHint')}</span>
                       )}
+                      {selectedSeriesIndex != null && <span className="text-xs text-gray-500 self-end">{t(rawData.coordinates?.time_kind === 'time' ? rawData.coordinates?.time_unit === 's' ? 'timeSeconds' : 'timeCoordinate' : 'timeIndex')}: {rawData.coordinates?.time?.[selectedSeriesIndex] ?? selectedSeriesIndex}{rawData.coordinates?.time_labels?.[selectedSeriesIndex] && ` · ${rawData.coordinates.time_labels[selectedSeriesIndex]}`}</span>}
                     </div>
                     <PixelSpectrum
                       wavenumber={rawSeriesSpectrum?.wavenumber || rawData.wavenumber}
@@ -517,7 +547,7 @@ export default function HyperspectralProcessing() {
                       rawSpectrum={rawSeriesSpectrum?.intensity}
                       processedSpectrum={processedSeriesSpectrum?.intensity}
                       processedWavenumber={processedSeriesSpectrum?.wavenumber}
-                      title={`${t('spectrumAtTime')} ${selectedSeriesIndex ?? 0}`}
+                      title={`${t('spectrumAtTime')} ${rawData.coordinates?.time?.[selectedSeriesIndex] ?? selectedSeriesIndex ?? 0}`}
                       height={window.innerHeight - 360}
                     />
                   </div>

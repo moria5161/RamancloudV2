@@ -71,6 +71,7 @@ class DownloadPayload(BaseModel):
     mode: str = "spectrum"
     baseline: Optional[List[float]] = None
     filename: str = "processed.txt"
+    format: str = "matrix"
 
 
 DEMO_SPECTRA = {
@@ -97,6 +98,8 @@ def clean_floats(values: Any) -> np.ndarray:
 
 
 def read_spectrum(content: bytes) -> Tuple[np.ndarray, np.ndarray]:
+    if content.startswith(b"\xef\xbb\xbf"):
+        content = content[3:]
     pattern = re.compile(rb"^\s*[-+]?(?:\d+(?:\.\d*)?|\.\d+)")
     rows = [line for line in content.splitlines() if pattern.match(line)]
     if not rows:
@@ -115,17 +118,49 @@ def read_spectrum(content: bytes) -> Tuple[np.ndarray, np.ndarray]:
     if df.shape[1] < 2:
         raise ValueError("Spectrum files need at least two numeric columns.")
     if df.shape[1] >= 4:
-        return df.iloc[:, -2].values.astype(float), df.iloc[:, -1].values.astype(float)
-    return df.iloc[:, 0].values.astype(float), df.iloc[:, -1].values.astype(float)
+        wave = df.iloc[:, -2].values.astype(float)
+    else:
+        wave = df.iloc[:, 0].values.astype(float)
+    intensity = df.iloc[:, -1].values.astype(float)
+    if not np.isfinite(wave).all() or not np.isfinite(intensity).all():
+        raise ValueError("Spectrum contains missing or non-finite values.")
+    return wave, intensity
 
 
-def read_time_series(content: bytes, instrument: str) -> Tuple[np.ndarray, np.ndarray, List[Any]]:
+def validate_mapping(wavenumber: np.ndarray, data: np.ndarray) -> None:
+    if not wavenumber.size or not data.size or data.shape[-1] != len(wavenumber):
+        raise ValueError("Spectral columns do not match the wavenumber axis.")
+    if not np.isfinite(wavenumber).all() or not np.isfinite(data).all():
+        raise ValueError("Mapping contains missing or non-finite spectral values.")
+
+
+def time_coordinates(values: Any, kind: str = "time") -> Dict[str, Any]:
+    values = np.asarray(values, dtype=float)
+    if not np.isfinite(values).all() or len(np.unique(values)) != len(values):
+        raise ValueError("Time coordinates must be finite and unique.")
+    return {"time": values.tolist(), "time_kind": kind}
+
+
+def read_horiba_table(content: bytes, coordinate_columns: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    df = pd.read_csv(io.BytesIO(content), sep="\t", header=None)
+    if df.iloc[0, :coordinate_columns].notna().any():
+        raise ValueError("Horiba wavenumber header must start with empty coordinate cells.")
+    header = df.iloc[0, coordinate_columns:]
+    missing = header.index[header.isna()]
+    if df.iloc[1:].loc[:, missing].notna().any().any():
+        raise ValueError("An intensity column has no wavenumber in the Horiba header.")
+    columns = header.index[header.notna()]
+    wave = header.loc[columns].values.astype(float)
+    data = df.iloc[1:].loc[:, columns].values.astype(float)
+    coords = df.iloc[1:, :coordinate_columns].values.astype(float)
+    validate_mapping(wave, data)
+    return wave, data, coords
+
+
+def read_time_series(content: bytes, instrument: str) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     if instrument == "Horiba":
-        df = pd.read_csv(io.BytesIO(content), sep="\t", header=None)
-        wavenumber = df.iloc[0].dropna().values.astype(float)
-        data = df.iloc[1:, 1 : len(wavenumber) + 1].values.astype(float)
-        index = list(range(data.shape[0]))
-        return wavenumber, data, index
+        wavenumber, data, coords = read_horiba_table(content, 1)
+        return wavenumber, data, time_coordinates(coords[:, 0])
 
     if instrument == "Renishaw":
         df = pd.read_csv(io.BytesIO(content), sep="\t", header=None)
@@ -133,52 +168,73 @@ def read_time_series(content: bytes, instrument: str) -> Tuple[np.ndarray, np.nd
             raise ValueError("Renishaw time series requires time, wavenumber, intensity columns.")
         df = df.iloc[:, :3]
         df.columns = ["time", "wavenumber", "intensity"]
+        if df.duplicated(["time", "wavenumber"]).any():
+            raise ValueError("Duplicate time/wavenumber pairs in Renishaw file.")
         pivot = df.pivot_table(index="time", columns="wavenumber", values="intensity", aggfunc="first")
-        return pivot.columns.values.astype(float), pivot.values.astype(float), pivot.index.tolist()
+        wave, data = pivot.columns.values.astype(float), pivot.values.astype(float)
+        validate_mapping(wave, data)
+        return wave, data, time_coordinates(pivot.index.values)
 
     if instrument == "Nanophoton":
         df = pd.read_csv(io.BytesIO(content), sep="\t")
         wavenumber = df.iloc[:, 0].values.astype(float)
         data_cols = np.arange(1, df.shape[1], 2)
         data = df.iloc[:, data_cols].values.astype(float).T[::-1]
-        return wavenumber, data, list(range(data.shape[0]))
+        validate_mapping(wavenumber, data)
+        labels = [str(df.columns[i]) for i in data_cols][::-1]
+        matches = [re.fullmatch(r"(\d{4}/\d{1,2}/\d{1,2} \d{1,2}:\d{2}:\d{2})(?: Cycle:\d+)?", label) for label in labels]
+        coordinates = time_coordinates(np.arange(data.shape[0]), "index")
+        if all(matches):
+            timestamps = pd.to_datetime([match.group(1) for match in matches], format="%Y/%m/%d %H:%M:%S", errors="coerce")
+            if not timestamps.isna().any():
+                coordinates = time_coordinates((timestamps - timestamps[0]).total_seconds())
+                coordinates["time_unit"] = "s"
+        coordinates["time_labels"] = labels
+        return wavenumber, data, coordinates
 
     raise ValueError(f"Unsupported instrument: {instrument}")
 
 
 def extract_xy(name: str, key: str) -> int:
-    match = re.match(r"x(?P<x>\d+)_y(?P<y>\d+)", str(name))
+    match = re.match(r"x(?P<x>-?\d+)_y(?P<y>-?\d+)", str(name))
     if not match:
         raise ValueError(f"Cannot read Nanophoton coordinate from column {name!r}.")
     return int(match.group(key))
 
 
-def read_imaging(content: bytes, instrument: str) -> Tuple[np.ndarray, np.ndarray, List[Any]]:
+def imaging_grid(wavenumber: np.ndarray, spectra: np.ndarray, coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    validate_mapping(wavenumber, spectra)
+    if not np.isfinite(coords).all():
+        raise ValueError("Imaging coordinates must be finite.")
+    x_vals = np.sort(np.unique(coords[:, 0]))
+    y_vals = np.sort(np.unique(coords[:, 1]))
+    pairs = set(map(tuple, coords.tolist()))
+    if len(pairs) != len(coords):
+        raise ValueError("Duplicate imaging coordinates found.")
+    if len(pairs) != len(x_vals) * len(y_vals):
+        raise ValueError("Incomplete imaging grid: some X/Y positions have no spectrum.")
+    # All instruments use row-major [Y, X, wavenumber], independent of file order.
+    data = np.empty((len(y_vals), len(x_vals), spectra.shape[1]), dtype=float)
+    x_lookup = {v: i for i, v in enumerate(x_vals)}
+    y_lookup = {v: i for i, v in enumerate(y_vals)}
+    for coord, spectrum in zip(coords, spectra):
+        data[y_lookup[coord[1]], x_lookup[coord[0]]] = spectrum
+    return wavenumber, data, {"x": x_vals.tolist(), "y": y_vals.tolist()}
+
+
+def read_imaging(content: bytes, instrument: str) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     if instrument == "Horiba":
-        df = pd.read_csv(io.BytesIO(content), sep="\t", header=None)
-        wavenumber = df.iloc[0].dropna().values.astype(float)
-        coords = df.iloc[1:, :2].values.astype(float)
-        spectra = df.iloc[1:, 2 : len(wavenumber) + 2].values.astype(float)
-        x_vals = np.sort(np.unique(coords[:, 0]))
-        y_vals = np.sort(np.unique(coords[:, 1]))
-        data = np.zeros((len(x_vals), len(y_vals), spectra.shape[1]), dtype=float)
-        x_lookup = {v: i for i, v in enumerate(x_vals)}
-        y_lookup = {v: i for i, v in enumerate(y_vals)}
-        for coord, spectrum in zip(coords, spectra):
-            data[x_lookup[coord[0]], y_lookup[coord[1]]] = spectrum
-        return wavenumber, data, coords.tolist()
+        wavenumber, spectra, coords = read_horiba_table(content, 2)
+        return imaging_grid(wavenumber, spectra, coords)
 
     if instrument == "Nanophoton":
         df = pd.read_csv(io.BytesIO(content), sep="\t")
         wavenumber = df["Wavenumber"].values.astype(float)
         cols = [c for c in df.columns if str(c).startswith("x")]
-        x_size = max(extract_xy(c, "x") for c in cols) + 1
-        y_size = max(extract_xy(c, "y") for c in cols) + 1
-        data = np.zeros((y_size, x_size, len(wavenumber)), dtype=float)
-        for col in cols:
-            x, y = extract_xy(col, "x"), extract_xy(col, "y")
-            data[y, x] = df[col].values.astype(float)
-        return wavenumber, data, [(extract_xy(c, "x"), extract_xy(c, "y")) for c in cols]
+        if not cols:
+            raise ValueError("No imaging coordinate columns found.")
+        coords = np.asarray([(extract_xy(c, "x"), extract_xy(c, "y")) for c in cols], dtype=float)
+        return imaging_grid(wavenumber, df[cols].values.astype(float).T, coords)
 
     raise ValueError(f"Unsupported imaging instrument: {instrument}")
 
@@ -443,13 +499,14 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
     return current_wn, current[0] if is_vector else current, (baseline[0] if is_vector and baseline is not None else baseline), history
 
 
-def register_dataset(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str) -> str:
+def register_dataset(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str, coordinates: Optional[Dict[str, Any]] = None) -> str:
     dataset_id = uuid.uuid4().hex
     DATASETS[dataset_id] = {
         "wavenumber": np.asarray(wavenumber, dtype=float),
         "data": np.asarray(data, dtype=float),
         "mode": mode,
         "filename": filename,
+        "coordinates": coordinates or {},
     }
     return dataset_id
 
@@ -480,8 +537,8 @@ def heatmap_slice(wavenumber: np.ndarray, data: np.ndarray, target: Optional[flo
     return data, float(wavenumber[idx]), idx, 1
 
 
-def mapping_payload(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str) -> Dict[str, Any]:
-    dataset_id = register_dataset(wavenumber, data, mode, filename)
+def mapping_payload(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str, coordinates: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    dataset_id = register_dataset(wavenumber, data, mode, filename, coordinates)
     if data.ndim == 3:
         flat = data.reshape(-1, data.shape[-1])
         mean = flat.mean(axis=0)
@@ -492,6 +549,7 @@ def mapping_payload(wavenumber: np.ndarray, data: np.ndarray, mode: str, filenam
         "dataset_id": dataset_id,
         "filename": filename,
         "mode": mode,
+        "coordinates": coordinates or {},
         "wavenumber": wavenumber.tolist(),
         "shape": list(data.shape),
         "preview": rounded_list(preview),
@@ -529,7 +587,10 @@ def demo_spectrum(name: str) -> Dict[str, Any]:
 async def upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
     spectra = []
     for file in files:
-        wave, intensity = read_spectrum(await file.read())
+        try:
+            wave, intensity = read_spectrum(await file.read())
+        except (ValueError, IndexError, pd.errors.ParserError) as exc:
+            raise HTTPException(status_code=400, detail="{}: {}".format(file.filename, exc)) from exc
         spectra.append({"filename": file.filename, "wavenumber": wave.tolist(), "intensity": intensity.tolist(), "length": len(wave)})
     return {"code": 0, "msg": "Upload successful", "data": {"spectra": spectra}}
 
@@ -541,10 +602,10 @@ def demo_mapping(name: str) -> Dict[str, Any]:
     sample, instrument, mode = DEMO_MAPPING[name]
     content = (SAMPLES / sample).read_bytes()
     if mode == "time_series":
-        wave, data, _ = read_time_series(content, instrument)
+        wave, data, coordinates = read_time_series(content, instrument)
     else:
-        wave, data, _ = read_imaging(content, instrument)
-    return {"code": 0, "msg": "Demo mapping loaded", "data": mapping_payload(wave, data, mode, sample)}
+        wave, data, coordinates = read_imaging(content, instrument)
+    return {"code": 0, "msg": "Demo mapping loaded", "data": mapping_payload(wave, data, mode, sample, coordinates)}
 
 
 @app.post("/api/upload-hyperspectral")
@@ -554,11 +615,16 @@ async def upload_mapping(
     mode: str = Form("imaging"),
 ) -> Dict[str, Any]:
     content = await file.read()
-    if mode == "time_series":
-        wave, data, _ = read_time_series(content, instrument)
-    else:
-        wave, data, _ = read_imaging(content, instrument)
-    return {"code": 0, "msg": "Mapping uploaded", "data": mapping_payload(wave, data, mode, file.filename or "mapping.txt")}
+    try:
+        if mode == "time_series":
+            wave, data, coordinates = read_time_series(content, instrument)
+        elif mode == "imaging":
+            wave, data, coordinates = read_imaging(content, instrument)
+        else:
+            raise ValueError("Unsupported mapping mode.")
+    except (ValueError, KeyError, IndexError, pd.errors.ParserError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"code": 0, "msg": "Mapping uploaded", "data": mapping_payload(wave, data, mode, file.filename or "mapping.txt", coordinates)}
 
 
 @app.post("/api/tools/split")
@@ -626,6 +692,7 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
         mode = source["mode"]
         filename = source["filename"]
         original_shape = source_data.shape
+        coordinates = source.get("coordinates", {})
         spectra = source_data.reshape(-1, source_data.shape[-1]) if source_data.ndim == 3 else source_data
     else:
         wave = clean_floats(payload.wavenumber)
@@ -634,6 +701,7 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
         mode = payload.mode
         filename = "processed_mapping.txt"
         original_shape = tuple(payload.shape or list(spectra.shape))
+        coordinates = {}
         if spectra.ndim > 2:
             spectra = spectra.reshape(-1, spectra.shape[-1])
     out_wave, out_spectra, baseline, history = apply_pipeline(wave, spectra, payload.steps)
@@ -642,10 +710,11 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
         processed_cube = out_spectra.reshape(int(original_shape[0]), int(original_shape[1]), out_spectra.shape[-1])
     else:
         processed_cube = out_spectra
-    processed_id = register_dataset(out_wave, processed_cube, mode, "processed_" + filename)
+    processed_id = register_dataset(out_wave, processed_cube, mode, "processed_" + filename, coordinates)
     preview, preview_wn, preview_idx, preview_scale = heatmap_slice(out_wave, processed_cube)
     response = {
         "processed_dataset_id": processed_id,
+        "coordinates": coordinates,
         "wavenumber": out_wave.tolist(),
         "preview": rounded_list(preview),
         "preview_wavenumber": preview_wn,
@@ -694,6 +763,8 @@ def get_hyperspectral_pixel(dataset_id: str, x: int = 0, y: int = 0) -> Dict[str
         "data": {
             "x": col,
             "y": row,
+            "coordinate_x": dataset["coordinates"].get("x", list(range(data.shape[1])))[col],
+            "coordinate_y": dataset["coordinates"].get("y", list(range(data.shape[0])))[row],
             "wavenumber": dataset["wavenumber"].tolist(),
             "intensity": rounded_list(data[row, col]),
         },
@@ -714,6 +785,7 @@ def get_hyperspectral_spectrum(dataset_id: str, index: int = 0) -> Dict[str, Any
         "msg": "Time-series spectrum loaded",
         "data": {
             "index": row,
+            "time": dataset["coordinates"].get("time", list(range(data.shape[0])))[row],
             "wavenumber": dataset["wavenumber"].tolist(),
             "intensity": rounded_list(data[row]),
         },
@@ -731,7 +803,17 @@ def download(payload: DownloadPayload) -> Response:
         data = dataset["data"]
         spectra = data.reshape(-1, data.shape[-1]) if data.ndim == 3 else data
         matrix = np.vstack([wave, spectra]).T
-        content = pd.DataFrame(matrix).to_csv(sep="\t", index=False, header=False, float_format="%.8g")
+        if payload.format == "mapping":
+            coordinates = dataset.get("coordinates", {})
+            if data.ndim == 3:
+                xs = coordinates.get("x", list(range(data.shape[1])))
+                ys = coordinates.get("y", list(range(data.shape[0])))
+                positions = np.asarray([(x, y) for y in ys for x in xs])
+                matrix = np.vstack([np.r_[np.nan, np.nan, wave], np.c_[positions, spectra]])
+            else:
+                times = coordinates.get("time", list(range(data.shape[0])))
+                matrix = np.vstack([np.r_[np.nan, wave], np.c_[times, spectra]])
+        content = pd.DataFrame(matrix).to_csv(sep="\t", index=False, header=False, float_format="%.17g" if payload.format == "mapping" else "%.8g")
     elif payload.spectra is not None:
         spectra = clean_floats(payload.spectra)
         wave = clean_floats(payload.wavenumber)

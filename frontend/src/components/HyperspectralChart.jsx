@@ -33,7 +33,7 @@ const equalPixelYAxis = {
 // ============================================================
 // Imaging Heatmap
 // ============================================================
-export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN, onHeatmapClick, title, height, colorscale, selectedPixel }) {
+export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN, onHeatmapClick, title, height, colorscale, selectedPixel, coordinates, previewScale = 1 }) {
   const layout = useChartLayout(darkLayout, wavenumber);
   const { t } = usePreferences();
   // Find closest wavenumber index
@@ -61,10 +61,11 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
 
   const traces = [{
     z: heatmapZ,
+    customdata: heatmapZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])),
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
     colorbar: { title: t('intensity'), titleside: 'right', thickness: 12, len: 0.6 },
-    hovertemplate: 'Pixel (%{x}, %{y})<br>Intensity: %{z:.2f}<extra></extra>',
+    hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('intensity')}: %{z:.2f}<extra></extra>`,
   }];
 
   const wnRange = wavenumber ? [Math.min(...wavenumber), Math.max(...wavenumber)] : [0, 4000];
@@ -112,20 +113,28 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
 // ============================================================
 // Time Series Heatmap
 // ============================================================
-export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscale, onHeatmapClick, selectedIndex }) {
+export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscale, onHeatmapClick, selectedIndex, timeCoordinates, timeKind, timeUnit, difference = false }) {
   const layout = useChartLayout(darkLayout, wavenumber);
   const { t } = usePreferences();
+  const timeTitle = t(timeKind === 'time' ? timeUnit === 's' ? 'timeSeconds' : 'timeCoordinate' : 'timeIndex');
   const indexAxis = useMemo(() => (
     Array.isArray(data2D) ? data2D.map((_, index) => index) : []
   ), [data2D]);
+  const bounds = useMemo(() => {
+    if (!difference) return {};
+    const { zmin = -1, zmax = 1 } = sharedHeatmapBounds([data2D]);
+    const limit = Math.max(Math.abs(zmin), Math.abs(zmax), 1e-12);
+    return { zmin: -limit, zmax: limit, zauto: false };
+  }, [data2D, difference]);
   const traces = [{
+    ...bounds,
     z: data2D || [[]],
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
-    colorbar: { title: t('intensity'), titleside: 'right', thickness: 12, len: 0.6 },
+    colorbar: { title: t(difference ? 'intensityDifference' : 'intensity'), titleside: 'right', thickness: 12, len: 0.6 },
     x: wavenumber,
-    y: indexAxis,
-    hovertemplate: 'Index %{y}<br>WN: %{x:.1f} cm⁻¹<br>Intensity: %{z:.2f}<extra></extra>',
+    y: timeCoordinates || indexAxis,
+    hovertemplate: `${timeTitle}: %{y}<br>%{x:.1f} cm⁻¹<br>${t(difference ? 'intensityDifference' : 'intensity')}: %{z:.2f}<extra></extra>`,
   }];
 
   return (
@@ -135,9 +144,9 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
         ...layout,
         height: height || 500,
         title: title || t('timeSeries'),
-        shapes: selectionShapes({ index: selectedIndex }),
+        shapes: selectionShapes({ index: timeCoordinates?.[selectedIndex] ?? selectedIndex }),
         xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
-        yaxis: { title: t('timeIndex'), gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
+        yaxis: { title: timeTitle, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
       onClick={onHeatmapClick}
@@ -150,9 +159,19 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
 // ============================================================
 // Compare Time Series (Raw vs Processed stacked)
 // ============================================================
-export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenumber, processedWavenumber, title, height, colorscale, onHeatmapClick, selectedIndex, sharedColorScale = true }) {
+export function TimeSeriesDifference({ rawData2D, processedData2D, rawWavenumber, processedWavenumber, ...props }) {
+  const { t } = usePreferences();
+  const difference = useMemo(() => {
+    const columns = new Map(rawWavenumber.map((value, index) => [value, index]));
+    return processedData2D.map((row, y) => row.map((value, x) => rawData2D[y][columns.get(processedWavenumber[x])] - value));
+  }, [rawData2D, processedData2D, rawWavenumber, processedWavenumber]);
+  return <TimeSeriesHeatmap {...props} data2D={difference} wavenumber={processedWavenumber} title={t('removedSignal')} colorscale="RdBu" difference />;
+}
+
+export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenumber, processedWavenumber, title, height, colorscale, onHeatmapClick, selectedIndex, sharedColorScale = true, timeCoordinates, timeKind, timeUnit }) {
   const layout = useChartLayout(darkLayout, rawWavenumber);
   const { t } = usePreferences();
+  const timeTitle = t(timeKind === 'time' ? timeUnit === 's' ? 'timeSeconds' : 'timeCoordinate' : 'timeIndex');
   const bounds = useMemo(() => sharedColorScale ? sharedHeatmapBounds([rawData2D, processedData2D]) : {}, [rawData2D, processedData2D, sharedColorScale]);
   const hasProcessed = Array.isArray(processedData2D) && processedData2D.length > 0;
   const rawIndexAxis = useMemo(() => (
@@ -169,11 +188,11 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
       colorscale: colorscale || 'Jet',
       colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: hasProcessed ? 0.4 : 0.6, y: hasProcessed ? 0.79 : 0.5 },
       x: rawWavenumber,
-      y: rawIndexAxis,
+      y: timeCoordinates || rawIndexAxis,
       name: t('raw'),
       xaxis: 'x',
       yaxis: 'y',
-      hovertemplate: 'Index %{y}<br>WN: %{x:.1f} cm⁻¹<br>Raw: %{z:.2f}<extra></extra>',
+      hovertemplate: `${timeTitle}: %{y}<br>%{x:.1f} cm⁻¹<br>${t('raw')}: %{z:.2f}<extra></extra>`,
     },
   ];
 
@@ -185,11 +204,11 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
       colorscale: colorscale || 'Jet',
       colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
       x: processedWavenumber || rawWavenumber,
-      y: processedIndexAxis,
+      y: timeCoordinates || processedIndexAxis,
       name: t('processed'),
       xaxis: 'x2',
       yaxis: 'y2',
-      hovertemplate: 'Index %{y}<br>WN: %{x:.1f} cm⁻¹<br>Processed: %{z:.2f}<extra></extra>',
+      hovertemplate: `${timeTitle}: %{y}<br>%{x:.1f} cm⁻¹<br>${t('processed')}: %{z:.2f}<extra></extra>`,
     });
   }
 
@@ -201,16 +220,16 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
         height: height || 600,
         margin: { l: 55, r: 95, t: 40, b: 55 },
         title: title || (hasProcessed ? t('rawProcessedComparison') : t('timeSeries')),
-        shapes: selectionShapes({ index: selectedIndex, compare: hasProcessed }),
+        shapes: selectionShapes({ index: timeCoordinates?.[selectedIndex] ?? selectedIndex, compare: hasProcessed }),
         ...(hasProcessed ? {
           grid: { rows: 2, columns: 1, subplots: [['xy'], ['x2y2']], roworder: 'top to bottom' },
           xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y' },
-          yaxis: { title: t('timeIndex'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.58, 1], anchor: 'x' },
+          yaxis: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.58, 1], anchor: 'x' },
           xaxis2: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y2', matches: 'x' },
-          yaxis2: { title: t('timeIndex'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 0.42], anchor: 'x2', matches: 'y' },
+          yaxis2: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 0.42], anchor: 'x2', matches: 'y' },
         } : {
           xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
-          yaxis: { title: t('timeIndex'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
+          yaxis: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
         }),
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
@@ -288,7 +307,7 @@ export function PixelSpectrum({ previewData, wavenumber, pixelX, pixelY, rawSpec
 // ============================================================
 // Compare Imaging (Raw vs Processed side by side)
 // ============================================================
-export function CompareImaging({ rawPreview, processedPreview, wavenumber, selectedWN, onSelectWN, onHeatmapClick, height, selectedPixel, sharedColorScale = true }) {
+export function CompareImaging({ rawPreview, processedPreview, wavenumber, selectedWN, onSelectWN, onHeatmapClick, height, selectedPixel, sharedColorScale = true, coordinates, previewScale = 1 }) {
   const layout = useChartLayout(darkLayout, wavenumber);
   const { t } = usePreferences();
   const wnIdx = useMemo(() => {
@@ -314,13 +333,15 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
   }, [processedPreview, wnIdx]);
 
   const bounds = useMemo(() => sharedColorScale ? sharedHeatmapBounds([rawZ, procZ]) : {}, [rawZ, procZ, sharedColorScale]);
+  const sourceCoordinates = useMemo(() => rawZ.map((row, y) => row.map((_, x) => [coordinates?.x?.[x * previewScale] ?? x * previewScale, coordinates?.y?.[y * previewScale] ?? y * previewScale])), [rawZ, coordinates, previewScale]);
   const traces = [
     {
       ...bounds,
       z: rawZ, type: 'heatmap', colorscale: 'Jet',
+      customdata: sourceCoordinates,
       colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: 0.4, y: 0.79 },
       name: t('raw'), xaxis: 'x', yaxis: 'y',
-      hovertemplate: '(%{x},%{y}) Raw: %{z:.2f}<extra></extra>',
+      hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('raw')}: %{z:.2f}<extra></extra>`,
     },
   ];
 
@@ -328,9 +349,10 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
     traces.push({
       ...bounds,
       z: procZ, type: 'heatmap', colorscale: 'Jet',
+      customdata: sourceCoordinates,
       colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
       name: t('processed'), xaxis: 'x2', yaxis: 'y2',
-      hovertemplate: '(%{x},%{y}) Proc: %{z:.2f}<extra></extra>',
+      hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('processed')}: %{z:.2f}<extra></extra>`,
     });
   }
 
