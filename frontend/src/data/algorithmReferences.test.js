@@ -14,7 +14,7 @@ test('references cover every non-skip algorithm exposed by the pipeline', () => 
 });
 
 test('retains the V1 paper links without obsolete approximation claims', () => {
-  for (const id of ['peer', 'airpls', 'aabs', 'imodpoly', 'airpls_old']) {
+  for (const id of ['peer', 'airpls', 'aabs', 'imodpoly']) {
     const item = algorithmReferences.find(item => item.id === id);
     assert.ok(!/simplified|currently uses|polynomial baseline fitting/.test(item.en));
   }

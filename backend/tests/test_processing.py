@@ -11,7 +11,7 @@ from pybaselines import Baseline
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app
-from algorithms.processing import correct_baseline, denoise, denoise_batch, validated_parameters
+from algorithms.processing import BASELINE_METHODS, correct_baseline, denoise, denoise_batch, validated_parameters
 
 
 class ProcessingTests(unittest.TestCase):
@@ -22,20 +22,23 @@ class ProcessingTests(unittest.TestCase):
         self.y = 100 + .03 * x + .0003 * x ** 2 + 30 * np.exp(-((x - 170) / 12) ** 2)
         self.y += np.random.default_rng(42).normal(0, 2, 400)
 
+    def test_baseline_methods_are_deliberately_limited(self):
+        self.assertEqual(BASELINE_METHODS, ('airpls', 'aabs', 'imodpoly', 'snip', 'skip'))
+
     def test_pybaselines_methods_match_v1_library_contract(self):
-        for name, api in [('airpls', 'airpls'), ('aspls', 'aspls'), ('imodpoly', 'imodpoly'), ('penalizedpoly', 'penalized_poly'), ('rollingball', 'rolling_ball'), ('mormol', 'mormol'), ('irsqr', 'irsqr'), ('snip', 'snip')]:
+        for name in ('airpls', 'imodpoly', 'snip'):
             with self.subTest(name=name):
                 params = validated_parameters(name, {})
                 if name == 'snip':
                     params['decreasing'] = True
-                expected, _ = getattr(Baseline(x_data=np.linspace(0, 400, 400)), api)(self.y, **params)
+                expected, _ = getattr(Baseline(x_data=np.linspace(0, 400, 400)), name)(self.y, **params)
                 corrected, baseline = correct_baseline(self.y, {}, name)
                 np.testing.assert_allclose(baseline, expected)
                 np.testing.assert_allclose(corrected + baseline, self.y)
 
     def test_parameters_change_results(self):
-        cases = [('airpls', {'lam': 100}), ('aspls', {'lam': 100}), ('aabs', {'Ln': 10, 'Lb': 80}), ('imodpoly', {'poly_order': 1}), ('penalizedpoly', {'poly_order': 1}), ('airpls_old', {'diff_order': 2}), ('rollingball', {'half_window': 10}), ('mormol', {'half_window': 10}), ('irsqr', {'quantile': .3}), ('snip', {'max_half_window': 8, 'smooth_half_window': 0})]
-        cases += [('aabs', {'Ln': 10}), ('aabs', {'Lb': 80}), ('airpls', {'diff_order': 1}), ('aspls', {'diff_order': 2}), ('airpls_old', {'lam': 1000}), ('snip', {'smooth_half_window': 0})]
+        cases = [('airpls', {'lam': 100}), ('aabs', {'Ln': 10, 'Lb': 80}), ('imodpoly', {'poly_order': 1}), ('snip', {'max_half_window': 8, 'smooth_half_window': 0})]
+        cases += [('aabs', {'Ln': 10}), ('aabs', {'Lb': 80}), ('airpls', {'diff_order': 1}), ('snip', {'smooth_half_window': 0})]
         for method, params in cases:
             with self.subTest(method=method):
                 self.assertGreater(np.max(np.abs(correct_baseline(self.y, {}, method)[0] - correct_baseline(self.y, params, method)[0])), 1e-5)
@@ -48,7 +51,7 @@ class ProcessingTests(unittest.TestCase):
         self.assertEqual(validated_parameters('airpls', {'lambda_': 200, 'order_': 2}), {'lam': 200., 'diff_order': 2})
 
     def test_invalid_parameters_rejected(self):
-        for method, params in [('sg', {'window_size': 8}), ('sg', {'order': 7}), ('wtd', {'level': 20}), ('peer', {'loops': 0}), ('airpls', {'lam': float('nan')}), ('aabs', {'unknown': 1}), ('snip', {'max_half_window': 300})]:
+        for method, params in [('sg', {'window_size': 8}), ('sg', {'order': 7}), ('wtd', {'level': 20}), ('peer', {'loops': 0}), ('airpls', {'lam': float('nan')}), ('aabs', {'unknown': 1}), ('snip', {'max_half_window': 300}), ('aspls', {})]:
             with self.subTest(method=method, params=params), self.assertRaises(ValueError):
                 if method in ('sg', 'wtd', 'peer'):
                     denoise(self.y, params, method)
@@ -64,7 +67,7 @@ class ProcessingTests(unittest.TestCase):
         self.assertGreater(np.max(np.abs(denoise_batch(matrix, {}, 'tsvd') - denoise_batch(matrix, {'threshold': 100}, 'tsvd'))), .01)
 
     def test_baseline_then_cut_and_multiple_baselines(self):
-        steps = [app.Step(type='baseline', method='imodpoly'), app.Step(type='baseline', method='rollingball'), app.Step(type='cut', params={'start': 300, 'end': 1600})]
+        steps = [app.Step(type='baseline', method='imodpoly'), app.Step(type='baseline', method='snip'), app.Step(type='cut', params={'start': 300, 'end': 1600})]
         wave, out, baseline, history = app.apply_pipeline(self.wave, self.y, steps)
         mask = (self.wave >= 300) & (self.wave <= 1600)
         np.testing.assert_allclose(out + baseline, self.y[mask])
