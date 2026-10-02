@@ -25,7 +25,7 @@ function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowWelcome(false), 2450);
+    const timer = setTimeout(() => setShowWelcome(false), 1950);
     return () => clearTimeout(timer);
   }, []);
 
