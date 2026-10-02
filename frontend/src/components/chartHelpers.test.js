@@ -1,6 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedHeatmapBounds, selectionShapes } from './chartHelpers.js';
+import { sharedHeatmapBounds, selectionShapes, imagingDisplay, imagingPixel } from './chartHelpers.js';
+
+test('Horiba display transposes rectangular slices without changing data or source coordinates', () => {
+  const matrix = [[1, 2, 3], [4, 5, 6]];
+  const original = structuredClone(matrix);
+  const coordinates = { x: [10, 20, 30], y: [5, 7] };
+  const display = imagingDisplay(matrix, coordinates, 1, true);
+  assert.deepEqual(display.z, [[1, 4], [2, 5], [3, 6]]);
+  assert.deepEqual(display.customdata[2][1], [30, 7]);
+  assert.deepEqual(matrix, original);
+  assert.deepEqual(imagingDisplay(matrix, coordinates).z, matrix);
+  assert.deepEqual(imagingDisplay(matrix, coordinates).customdata[1][2], [30, 7]);
+});
+
+test('transposed pixel selection round trips and respects preview scale', () => {
+  const pixel = { x: 2, y: 1 };
+  assert.deepEqual(imagingPixel(imagingPixel(pixel, true), true), pixel);
+  assert.equal(imagingPixel(null, true), null);
+  assert.deepEqual(imagingDisplay([[1, 2], [3, 4]], { x: [10, 20, 30], y: [5, 6, 7] }, 2, true).customdata[1][0], [30, 5]);
+  assert.deepEqual(imagingDisplay([[]], {}, 1, true).z, []);
+});
 
 function checkBounds(actual, minimum, maximum) {
   assert.ok(Math.abs(actual.zmin - minimum) < 1e-10);
