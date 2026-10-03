@@ -19,7 +19,7 @@ export function createProcessingRecord(source, mode, rawData, result, steps, sta
     steps: pipelineSnapshot(steps),
     data_format: 'Tab-separated text without a header; first column is wavenumber. Remaining columns are intensities, with an optional baseline column for single spectra.',
     effective_steps: result.history,
-    algorithm_note: 'V1-derived PEER and AABS; pybaselines 1.2.1 airPLS, IModPoly, and SNIP; PyWavelets WTD; NumPy TSVD.',
+    algorithm_note: 'PEER and AABS; pybaselines 1.2.1 airPLS, IModPoly, and SNIP; PyWavelets WTD; NumPy TSVD.',
   };
 }
 

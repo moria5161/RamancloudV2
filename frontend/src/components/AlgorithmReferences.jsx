@@ -15,7 +15,7 @@ export default function AlgorithmReferences() {
         </p>
       </div>
       <p className="text-sm text-gray-400">
-        {isZh ? '以下方法用于单光谱、成像和时间序列的预处理。算法沿用 V1 的实现或同名科学计算库方法；各处理步骤提供可调参数与参数说明。' : 'These methods use V1-derived implementations or the same scientific-library methods as V1. Each processing step includes adjustable parameters and a parameter guide.'}
+        {isZh ? '以下方法用于单光谱、成像和时间序列的预处理；各处理步骤提供可调参数与参数说明。' : 'These methods support preprocessing of spectra, imaging, and time series. Each processing step includes adjustable parameters and a parameter guide.'}
       </p>
       {['denoise', 'baseline'].map(group => (
         <div key={group} className="glass rounded-xl border border-white/5 p-5 sm:p-6">
