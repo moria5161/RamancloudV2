@@ -176,7 +176,7 @@ export default function SpectralProcessing() {
     <div className="flex h-full relative">
       <WorkspaceFeedback task={task} error={error} onDismiss={() => setError(null)} />
       {/* Center: Visualization */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="workspace-visual-surface flex-1 flex flex-col min-w-0 relative">
         <div className="workspace-toolbar flex items-center justify-between px-5 py-3 border-b border-white/5 glass">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
