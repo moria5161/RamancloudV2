@@ -16,10 +16,10 @@ export const algorithms = [
     number('loops', 3, 1, 20, 'Iterations', '迭代次数', 'Number of peak-retaining smoothing passes.', '保留峰形的平滑迭代次数。'),
     number('half_k_threshold', 2, 0, 7, 'Peak seeking', '寻峰参数', 'Controls derivative-based peak rejection; compare peak retention when adjusting it.', '控制基于导数的峰筛选；调节时应比较峰的保留情况。'),
   ] },
-  { id: 'tsvd', type: 'denoise', name: 'TSVD', batchOnly: true, fields: [number('threshold', 0.001, 0, 100, 'Curvature threshold', '曲率阈值', 'V1 criterion: threshold the second derivative of log1p singular values. Requires multiple aligned spectra.', 'V1 判据：对 log1p 奇异值的二阶差分设阈值；需要多条波数对齐的光谱。', 'any')] },
+  { id: 'tsvd', type: 'denoise', name: 'TSVD', batchOnly: true, fields: [number('threshold', 0.001, 0, 100, 'Curvature threshold', '曲率阈值', 'Threshold the second derivative of log1p singular values. Requires multiple aligned spectra.', '对 log1p 奇异值的二阶差分设阈值；需要多条波数对齐的光谱。', 'any')] },
   { id: 'airpls', type: 'baseline', name: 'airPLS', fields: [lam(1e7), diff] },
   { id: 'aabs', type: 'baseline', name: 'Auto-Adaptive (AABS)', fields: [
-    number('Ln', 6, 2, 100, 'Ln', 'Ln', 'Local noise/derivative smoothing window in the V1 auto-adaptive algorithm.', 'V1 自适应算法中的局部噪声和导数平滑窗口。'),
+    number('Ln', 6, 2, 100, 'Ln', 'Ln', 'Local noise/derivative smoothing window in the auto-adaptive algorithm.', '自适应算法中的局部噪声和导数平滑窗口。'),
     number('Lb', 140, 5, 1000, 'Lb', 'Lb', 'Background smoothing window. Requires at least max(100, Ln, Lb) spectral points.', '背景平滑窗口；光谱至少需 max(100, Ln, Lb) 个点。'),
   ] },
   { id: 'imodpoly', type: 'baseline', name: 'IModPoly', fields: [poly] },
