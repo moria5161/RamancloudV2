@@ -583,6 +583,52 @@ a:active {
   background: rgba(255,255,255,0.12);
 }
 
+:root[data-theme="dark"] .bg-white\/5 {
+  background: rgba(255, 255, 255, 0.055) !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-white\/10:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-theme="dark"] .glass::before {
+  opacity: 0.1;
+}
+
+:root[data-theme="dark"] .glass:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 52px rgba(0, 0, 0, 0.32);
+}
+
+:root[data-theme="dark"] .nav-liquid[aria-current="page"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 24px rgba(0, 113, 227, 0.1);
+}
+
+:root[data-theme="dark"] .nav-liquid::after,
+:root[data-theme="dark"] .liquid-card::after,
+:root[data-theme="dark"] .liquid-button::after {
+  opacity: 0.15;
+}
+
+:root[data-theme="dark"] .liquid-icon {
+  border-color: var(--rc-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .liquid-icon-indigo,
+:root[data-theme="dark"] .liquid-icon-emerald,
+:root[data-theme="dark"] .liquid-icon-amber {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
