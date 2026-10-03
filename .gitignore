@@ -14,3 +14,9 @@ backend/.pytest_cache/
 /EXPERIMENTS.md
 /DEPLOYMENT.md
 backend/runtime/
+/.venv/
+/build/
+/dist/
+/*.egg-info/
+/desktop/build/
+/desktop/dist/

@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ramancloud"
+version = "2.2.0"
+description = "Raman spectral preprocessing for the web, desktop, and MCP agents"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name = "Ren Research Group, Xiamen University"}]
+dependencies = [
+  "fastapi>=0.115,<0.120",
+  "uvicorn>=0.30,<0.35",
+  "python-multipart>=0.0.18",
+  "pydantic>=2.11,<3",
+  "numpy>=1.24,<3",
+  "pandas>=2,<3",
+  "scipy>=1.11,<2",
+  "PyWavelets>=1.5,<2",
+  "pybaselines==1.2.1",
+  "maxminddb>=2.6,<4",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.26,<2", "sse-starlette>=2.1,<3.1"]
+desktop = ["pywebview>=6,<7"]
+dev = ["pytest>=8,<9", "httpx>=0.27,<1", "build>=1.2,<2", "pyinstaller>=6.16,<7"]
+
+[project.scripts]
+ramancloud-mcp = "ramancloud_mcp.server:main"
+ramancloud-desktop = "desktop.launcher:main"
+
+[project.urls]
+Homepage = "https://ramancloud.xmu.edu.cn/preprocessing/"
+Repository = "https://github.com/moria5161/RamancloudV2"
+Issues = "https://github.com/moria5161/RamancloudV2/issues"
+
+[tool.setuptools]
+packages = ["ramancloud_backend", "ramancloud_backend.algorithms", "ramancloud_mcp", "desktop"]
+include-package-data = false
+
+[tool.setuptools.package-dir]
+ramancloud_backend = "backend"
+"ramancloud_backend.algorithms" = "backend/algorithms"
+ramancloud_mcp = "ramancloud_mcp"
+desktop = "desktop"
+
+[tool.setuptools.package-data]
+ramancloud_backend = ["samples/*.txt", "historical_visits.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "tests"]

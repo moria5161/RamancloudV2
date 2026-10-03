@@ -1,0 +1,174 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  desktop:
+    name: Build and Test ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: windows-x64
+            architecture: x64
+          - runner: macos-15-intel
+            platform: macos-x64
+            architecture: x64
+          - runner: macos-15
+            platform: macos-arm64
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: ${{ matrix.architecture }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the complete offline frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Install packaged backend and native shell
+        run: python -m pip install '.[desktop,dev]' -r desktop/requirements-build.txt
+      - name: Test desktop routing, lifecycle, and save bridge
+        run: python -m unittest discover -s desktop/tests -v
+      - name: Test spectral visualization and algorithm references
+        run: node --test frontend/src/components/chartHelpers.test.js frontend/src/data/algorithmReferences.test.js
+      - name: Freeze native onedir application
+        run: python desktop/build.py --platform '${{ matrix.platform }}'
+      - name: Ensure the Windows native WebView runtime is available
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $key = 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $user = Get-ItemProperty "HKCU:\$key" -ErrorAction SilentlyContinue
+          $machine = Get-ItemProperty "HKLM:\Software\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
+          if (!$user.pv -and !$machine.pv) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $process = Start-Process $installer -ArgumentList '/silent','/install' -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "WebView2 installer failed: $($process.ExitCode)" }
+          }
+          python -c "from desktop.launcher import require_webview2; require_webview2()"
+      - name: Test the actual frozen API, static assets, demos, and processing
+        run: python desktop/verify_bundle.py --mode api
+      - name: Test the actual native WebView and Blob exports
+        run: python desktop/verify_bundle.py --mode gui
+      - name: Install browser verification tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ramancloud-ui" playwright@1.56.1 pngjs@7
+          node "$RUNNER_TEMP/ramancloud-ui/node_modules/playwright/cli.js" install chromium
+      - name: Verify complete offline workflows in the actual frozen application
+        env:
+          NODE_PATH: ${{ runner.temp }}/ramancloud-ui/node_modules
+        run: python scripts/verify_frozen_ui.py
+      - name: Archive the verified application and checksum
+        run: python desktop/artifacts.py archive --platform '${{ matrix.platform }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-asset-${{ matrix.platform }}
+          path: desktop/artifacts/*
+          if-no-files-found: error
+      - name: Preserve runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-diagnostics-${{ matrix.platform }}
+          path: |
+            desktop/test-results/
+            desktop/build/ramancloud/warn-ramancloud.txt
+          if-no-files-found: ignore
+
+  python-package:
+    name: Build and Test MCP Distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install '.[mcp,dev]'
+      - name: Test shared algorithms, file formats and actual MCP protocol
+        run: python -m pytest backend/tests tests
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Install wheel in an isolated environment
+        run: |
+          python -m venv "$RUNNER_TEMP/ramancloud-mcp"
+          "$RUNNER_TEMP/ramancloud-mcp/bin/python" -m pip install "$(ls dist/*.whl)[mcp]"
+      - name: Verify all MCP tools from the installed distribution
+        run: |
+          "$RUNNER_TEMP/ramancloud-mcp/bin/python" scripts/verify_mcp_package.py \
+            --executable "$RUNNER_TEMP/ramancloud-mcp/bin/ramancloud-mcp" \
+            --output-dir "$RUNNER_TEMP/ramancloud-mcp-results"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
+      - name: Preserve MCP verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-diagnostics
+          path: ${{ runner.temp }}/ramancloud-mcp-results
+          if-no-files-found: ignore
+
+  release:
+    name: Publish Verified Assets
+    needs: [desktop, python-package]
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-asset-*
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: release-assets
+      - name: Validate individual checksums and write combined manifest
+        run: python desktop/artifacts.py checksums --directory release-assets
+      - name: Publish GitHub Release with GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "RamanCloud Desktop ${GITHUB_REF_NAME#desktop-v}" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false

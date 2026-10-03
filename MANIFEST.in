@@ -1,0 +1,17 @@
+include README.md LOCAL_SETUP.md MCP.md DESKTOP.md
+include frontend/package.json frontend/package-lock.json frontend/index.html frontend/vite.config.js
+recursive-include frontend/src *.js *.jsx *.css
+recursive-include frontend/public *
+recursive-include desktop *.py *.spec *.txt
+recursive-include scripts *.cjs *.py
+recursive-include tests *.py
+recursive-include backend/tests *.py
+prune frontend/node_modules
+prune frontend/dist
+prune backend/runtime
+prune backend/.venv
+prune desktop/build
+prune desktop/dist
+prune desktop/artifacts
+prune desktop/test-results
+global-exclude __pycache__ *.py[cod]

@@ -22,8 +22,12 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel, Field
-from visit_statistics import router as visit_statistics_router
-from algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
+if __package__:
+    from .visit_statistics import router as visit_statistics_router
+    from .algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
+else:
+    from visit_statistics import router as visit_statistics_router
+    from algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
 
 
 ROOT = Path(__file__).resolve().parent

@@ -12,7 +12,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from visit_geolocation import CountryLookup
+if __package__:
+    from .visit_geolocation import CountryLookup
+else:
+    from visit_geolocation import CountryLookup
 
 ROUTES = ("/", "/spectral", "/hyperspectral", "/extra-tools", "/tutorial", "/contributors")
 DATA_DIR = Path(os.environ.get("RAMANCLOUD_ANALYTICS_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "ramancloud" / "analytics"))
