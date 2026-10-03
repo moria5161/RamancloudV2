@@ -143,6 +143,16 @@ failure logs its traceback and shows a readable native error dialog for GUI
 launches. Source and headless checks also report failures on stderr and exit 1.
 CI keeps JSON smoke reports, screenshots, and runtime logs as diagnostic artifacts.
 
+Intel GitHub-hosted macOS VMs can lose their WebGL context (GPU error 37442).
+The native check on that runner explicitly verifies the existing website's
+unavailable-globe message and the complete country/region list, alongside
+native SVG spectra, API processing, and file exports. It does not claim a native
+Intel GPU rendering test. Windows and Apple Silicon native checks require real
+globe pixels; the complete frozen-browser check requires globe pixels, rotation,
+and zoom on every platform. On a Mac with WebGL2 graphics support, the same
+bundled globe renders in WKWebView. See the
+[GitHub runner graphics issue](https://github.com/actions/runner-images/issues/6924).
+
 ## Release Pipeline
 
 The tag workflow builds on native Windows, Intel Mac, and Apple Silicon Mac
