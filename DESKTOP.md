@@ -103,7 +103,7 @@ TXT/ZIP exports, split/merge/conversion, local statistics, and shutdown. Frozen
 checks run from an unrelated working directory and require `sys.frozen`.
 
 `--gui-smoke-test` opens the real native engine, checks the rendered React root,
-WebGL2 pixel output, API processing, and the injected Blob bridge's exact TXT/ZIP
+WebGL2 and actual globe pixel output, API processing, and the injected Blob bridge's exact TXT/ZIP
 bytes. Save destinations are substituted to keep this check noninteractive; it
 does **not** automate the OS save picker. Manually check file upload and native
 save-dialog cancellation on both OS families before shipping a new renderer
