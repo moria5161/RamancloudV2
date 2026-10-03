@@ -7,7 +7,7 @@ const darkLayout = {
   paper_bgcolor: 'rgba(0,0,0,0)',
   plot_bgcolor: 'rgba(0,0,0,0)',
   modebar: {
-    bgcolor: 'rgba(255,255,255,0.42)',
+    bgcolor: 'rgba(0,0,0,0)',
     color: 'rgba(0,0,0,0.34)',
     activecolor: '#0071e3',
   },
