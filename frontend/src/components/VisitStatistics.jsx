@@ -62,8 +62,8 @@ export default function VisitStatistics() {
           <VisitorGlobe data={data} compact />
           <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
             {isZh
-              ? '历史与新增访问已合并，仅展示国家或地区级聚合数据，不保存原始 IP 或精确位置。'
-              : 'Historical and new visits are combined. Only country-level aggregates are shown; no raw IP or precise location is stored.'}
+              ? '新旧网页合并统计。'
+              : 'Combined statistics for the current and previous websites.'}
           </p>
         </>
       )}
