@@ -50,11 +50,20 @@ def prepare_gui_smoke(window, bridge, directory):
               })).json();
               if (processed.code !== 0 || !processed.data.intensity.length) throw new Error('Native engine API integration failed');
               const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 8;
-              const gl = canvas.getContext('webgl2');
+              canvas.style.cssText = 'position:fixed;left:0;top:0;width:8px;height:8px';
+              document.body.appendChild(canvas);
+              const gl = canvas.getContext('webgl2', {preserveDrawingBuffer: true, antialias: false});
               if (!gl) throw new Error('Native engine cannot create WebGL2 (required by Three.js)');
-              gl.clearColor(1, 0.25, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-              const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-              if (pixel[0] < 200 || pixel[1] < 40) throw new Error('Native WebGL canvas is blank');
+              const pixel = new Uint8Array(4);
+              for (let frame = 0; frame < 5; frame++) {
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.clearColor(1, 0.25, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.finish();
+                await new Promise(requestAnimationFrame);
+                gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                if (pixel[0] >= 200 && pixel[1] >= 40) break;
+              }
+              if (pixel[0] < 200 || pixel[1] < 40) throw new Error('Native WebGL canvas is blank: ' + JSON.stringify({pixel: Array.from(pixel), error: gl.getError(), lost: gl.isContextLost(), renderer: gl.getParameter(gl.RENDERER), version: gl.getParameter(gl.VERSION), drawingBuffer: [gl.drawingBufferWidth, gl.drawingBufferHeight]}));
+              canvas.remove();
               for (let i = 0; i < 100 && document.querySelector('.welcome-screen'); i++) await wait(100);
               const visits = document.querySelector('button[aria-label="View global visits"]');
               if (!visits) throw new Error('Homepage visits control did not render');
