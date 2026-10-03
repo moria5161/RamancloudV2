@@ -61,7 +61,7 @@ class Frontend(StaticFiles):
         self.native_downloads = native_downloads
 
     async def get_response(self, path, scope):
-        route = path.strip("/")
+        route = path.replace("\\", "/").strip("/")
         if route == ".":
             route = ""
         if route in UI_ROUTES:
@@ -71,7 +71,7 @@ class Frontend(StaticFiles):
             native = "true" if self.native_downloads else "false"
             index = index.replace("<head>", f'<head><script src="/preprocessing/__desktop__/bridge.js" data-native-downloads="{native}"></script>', 1)
             return HTMLResponse(index, headers={"Cache-Control": "no-store"})
-        if path == "__desktop__/bridge.js":
+        if route == "__desktop__/bridge.js":
             return Response(BRIDGE_JS, media_type="application/javascript", headers={"Cache-Control": "no-store"})
         return await super().get_response(path, scope)
 

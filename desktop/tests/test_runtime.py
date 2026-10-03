@@ -99,6 +99,14 @@ class RuntimeTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             frontend_directory(self.directory / "missing")
 
+    def test_bridge_route_accepts_windows_static_path_separators(self):
+        import asyncio
+        from desktop.runtime import Frontend
+        response = asyncio.run(Frontend(directory=self.frontend).get_response(
+            r"__desktop__\bridge.js", {"type": "http"}))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"begin_download", response.body)
+
     def test_serve_mode_can_use_browser_downloads(self):
         self.runtime.socket.close()
         self.runtime = RuntimeServer(self.frontend, self.directory / "data", backend=self.runtime.backend, native_downloads=False)
