@@ -521,6 +521,21 @@ a:active {
   box-shadow: none;
 }
 
+.workspace-visual-surface,
+.workspace-visual-surface > .workspace-toolbar.glass {
+  background: var(--rc-surface-solid);
+}
+
+.workspace-visual-surface > .workspace-toolbar.glass {
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.workspace-visual-surface > .workspace-toolbar.glass::before {
+  display: none;
+}
+
 .settings-dock {
   position: fixed;
   left: 196px;
