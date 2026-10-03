@@ -54,7 +54,7 @@ const translations = {
     algorithms: 'Core Algorithms',
     algorithmsDesc: 'SG, WTD, PEER, and TSVD for denoising; airPLS, AABS, IModPoly, and SNIP for baseline correction.',
     processingModules: 'Processing Modules',
-    recentResearch: 'Recent Research of Ren Research Group',
+    recentResearch: 'Our Recent Publications',
     researchClassification: 'Spectral Classification',
     researchDenoising: 'Denoising & Super Resolution',
     researchStructure: 'Spectra & Structure',

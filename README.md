@@ -4,6 +4,10 @@ An online workspace for Raman spectral preprocessing.
 
 **[Open RamanCloud](https://ramancloud.xmu.edu.cn/preprocessing/)**
 
+Use the same workspace offline with the [Windows and macOS desktop downloads](https://github.com/moria5161/RamancloudV2/releases/latest). See [desktop setup](DESKTOP.md) for installation.
+
+For agent-driven processing, the [RamanCloud MCP server](MCP.md) exposes the same spectral, hyperspectral, and file tools to Codex and other MCP clients.
+
 ## Features
 
 - Process individual spectra, time series, and hyperspectral images.
@@ -13,7 +17,7 @@ An online workspace for Raman spectral preprocessing.
 - Download processed data with optional processing records, split or merge spectral files, and convert between supported instrument formats.
 - Apply one pipeline to multiple uploaded spectra, export batch results, or download baselines separately.
 - Switch between English and Chinese, with light and dark themes.
-- Explore country/region visit counts on an interactive globe, with historical snapshots shown separately.
+- Explore combined country/region visit counts on an interactive globe.
 
 ## Workflow
 
@@ -30,6 +34,6 @@ To run your own copy, see the [local setup guide](LOCAL_SETUP.md).
 
 ## Architecture
 
-React and Plotly provide the interactive workspace; FastAPI handles data loading and processing. Nginx serves the frontend and forwards API requests to the backend.
+React and Plotly provide the interactive workspace; FastAPI handles data loading and processing. The desktop app bundles this workspace with a local backend and uses the operating system's WebView. The MCP server calls the same parsers and algorithms directly.
 
 Developed by Ren Research Group, Xiamen University.
