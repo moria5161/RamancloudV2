@@ -75,7 +75,7 @@ jobs:
       - name: Test the actual frozen API, static assets, demos, and processing
         run: python desktop/verify_bundle.py --mode api
       - name: Test the actual native WebView and Blob exports
-        run: python desktop/verify_bundle.py --mode gui
+        run: python desktop/verify_bundle.py --mode gui ${{ matrix.platform == 'macos-x64' && '--allow-webgl-fallback' || '' }}
       - name: Install browser verification tools
         run: |
           npm install --prefix "$RUNNER_TEMP/ramancloud-ui" playwright@1.56.1 pngjs@7

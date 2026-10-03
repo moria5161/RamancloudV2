@@ -104,7 +104,7 @@ def require_webview2():
     raise RuntimeError("Microsoft Edge WebView2 Runtime is not installed. For offline setup, install Microsoft's x64 Evergreen Standalone Installer, then restart RamanCloud. The Edge browser alone is not sufficient.")
 
 
-def open_window(runtime, data_directory, debug=False, gui_smoke=False):
+def open_window(runtime, data_directory, debug=False, gui_smoke=False, allow_webgl_fallback=False):
     if sys.platform not in ("win32", "darwin"):
         raise RuntimeError("Native desktop releases support Windows and macOS. Use --serve or --smoke-test on Linux.")
     if sys.platform == "win32":
@@ -122,7 +122,7 @@ def open_window(runtime, data_directory, debug=False, gui_smoke=False):
     verify, gui_report, done = (None, None, None)
     if gui_smoke:
         from .gui_smoke import prepare_gui_smoke
-        verify, gui_report, done = prepare_gui_smoke(window, bridge, data_directory)
+        verify, gui_report, done = prepare_gui_smoke(window, bridge, data_directory, allow_webgl_fallback)
     stopped = threading.Event()
     window.events.closed += stopped.set
 
@@ -172,6 +172,7 @@ def main(argv=None):
     parser.add_argument("--frontend-dist", type=Path, help="Source mode only: use an existing frontend build")
     parser.add_argument("--data-dir", type=Path, help="Override the writable application data directory")
     parser.add_argument("--debug", action="store_true", help="Enable native WebView developer tools")
+    parser.add_argument("--allow-webgl-fallback", action="store_true", help="GUI smoke only: verify the existing fallback if the GPU reports context loss")
     parser.add_argument("--version", action="version", version="RamanCloud " + application_version())
     args = parser.parse_args(argv)
     if args.ready_file and not args.serve:
@@ -180,6 +181,8 @@ def main(argv=None):
         parser.error("--smoke-report requires --smoke-test or --gui-smoke-test")
     if args.native_downloads and not args.serve:
         parser.error("--native-downloads requires --serve")
+    if args.allow_webgl_fallback and not args.gui_smoke_test:
+        parser.error("--allow-webgl-fallback requires --gui-smoke-test")
     runtime = None
     report = {"ok": False, "version": application_version(), "frozen": bool(getattr(sys, "frozen", False))}
     failure = None
@@ -203,7 +206,7 @@ def main(argv=None):
             elif args.serve:
                 serve(runtime, args.ready_file)
             else:
-                result = open_window(runtime, directory, args.debug, args.gui_smoke_test)
+                result = open_window(runtime, directory, args.debug, args.gui_smoke_test, args.allow_webgl_fallback)
                 if result:
                     report.update(result)
         except KeyboardInterrupt:

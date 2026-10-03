@@ -10,12 +10,21 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
-from desktop.launcher import open_window, require_webview2
+from desktop.launcher import main, open_window, require_webview2
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class LauncherTests(unittest.TestCase):
+    def test_webgl_fallback_flag_is_limited_to_gui_checks(self):
+        with patch("desktop.launcher.RuntimeServer") as runtime:
+            for arguments in (["--allow-webgl-fallback"], ["--serve", "--allow-webgl-fallback"],
+                              ["--smoke-test", "--allow-webgl-fallback"]):
+                with self.subTest(arguments=arguments), self.assertRaises(SystemExit) as error:
+                    main(arguments)
+                self.assertEqual(error.exception.code, 2)
+            runtime.assert_not_called()
+
     def test_native_smoke_exports_use_a_new_directory_each_run(self):
         from desktop.gui_smoke import prepare_gui_smoke
         with tempfile.TemporaryDirectory() as directory:
