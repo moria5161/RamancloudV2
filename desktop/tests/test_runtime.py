@@ -95,7 +95,7 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(frontend_directory(), self.directory / "frontend_dist")
             with self.assertRaises(ValueError):
                 frontend_directory(self.frontend)
-        self.assertEqual(frontend_directory(self.frontend), self.frontend)
+        self.assertEqual(frontend_directory(self.frontend), self.frontend.resolve())
         with self.assertRaises(FileNotFoundError):
             frontend_directory(self.directory / "missing")
 

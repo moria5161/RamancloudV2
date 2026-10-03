@@ -126,6 +126,14 @@ def open_window(runtime, data_directory, debug=False, gui_smoke=False):
     stopped = threading.Event()
     window.events.closed += stopped.set
 
+    def before_close():
+        # Cocoa Cmd-Q can terminate the process without returning from start().
+        stopped.set()
+        bridge._close()
+        runtime.stop()
+
+    window.events.closing += before_close
+
     def monitor():
         while not stopped.wait(0.5):
             if runtime.error or not runtime.thread.is_alive():
@@ -139,7 +147,7 @@ def open_window(runtime, data_directory, debug=False, gui_smoke=False):
         # No MSHTML/IE fallback: Plotly/Three/React require a modern engine.
         webview.start(func=verify, gui="edgechromium" if sys.platform == "win32" else "cocoa", debug=debug,
                       private_mode=False, storage_path=str(data_directory / "webview"))
-        if runtime.error or not runtime.thread.is_alive():
+        if runtime.error or (not runtime.thread.is_alive() and not stopped.is_set()):
             raise RuntimeError("Desktop API stopped unexpectedly") from runtime.error
         if gui_smoke:
             if not done.is_set() or not gui_report.get("ok"):

@@ -8,14 +8,57 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from desktop.launcher import require_webview2
+from desktop.launcher import open_window, require_webview2
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class LauncherTests(unittest.TestCase):
+    def test_native_smoke_exports_use_a_new_directory_each_run(self):
+        from desktop.gui_smoke import prepare_gui_smoke
+        with tempfile.TemporaryDirectory() as directory:
+            first, second = Mock(), Mock()
+            prepare_gui_smoke(MagicMock(), first, directory)
+            prepare_gui_smoke(MagicMock(), second, directory)
+            first_path = first._attach.call_args.args[0]._directory
+            second_path = second._attach.call_args.args[0]._directory
+            self.assertNotEqual(first_path, second_path)
+            self.assertTrue(first_path.is_dir())
+            self.assertTrue(second_path.is_dir())
+            self.assertEqual(list(first_path.iterdir()), [])
+            self.assertEqual(list(second_path.iterdir()), [])
+
+    def test_native_closing_cleans_backend_before_os_termination(self):
+        class Event:
+            def __init__(self):
+                self.handlers = []
+
+            def __iadd__(self, handler):
+                self.handlers.append(handler)
+                return self
+
+            def emit(self):
+                for handler in self.handlers:
+                    handler()
+
+        window = SimpleNamespace(events=SimpleNamespace(closed=Event(), closing=Event()))
+        runtime = SimpleNamespace(url="http://127.0.0.1:1234/preprocessing/", error=None,
+                                  thread=Mock(), stop=Mock())
+        runtime.thread.is_alive.return_value = True
+
+        def terminate(**kwargs):
+            window.events.closing.emit()
+            runtime.stop.assert_called_once()
+            runtime.thread.is_alive.return_value = False
+            window.events.closed.emit()
+
+        native = SimpleNamespace(settings={}, create_window=Mock(return_value=window), start=Mock(side_effect=terminate))
+        with patch.dict("sys.modules", {"webview": native}), patch("sys.platform", "darwin"):
+            open_window(runtime, ROOT)
+        self.assertEqual(native.start.call_args.kwargs["gui"], "cocoa")
+
     def test_webview2_missing_runtime_fails_without_ie_fallback(self):
         registry = SimpleNamespace(HKEY_CURRENT_USER=1, HKEY_LOCAL_MACHINE=2, KEY_READ=4, KEY_WOW64_32KEY=8,
                                    OpenKey=Mock(side_effect=FileNotFoundError()))

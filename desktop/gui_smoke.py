@@ -5,6 +5,7 @@ import io
 import json
 import threading
 import time
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -18,8 +19,9 @@ class SmokeDialog:
 
 
 def prepare_gui_smoke(window, bridge, directory):
-    directory = Path(directory) / "native-exports"
-    directory.mkdir(parents=True, exist_ok=True)
+    parent = Path(directory)
+    parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="native-exports-", dir=parent))
     bridge._attach(SmokeDialog(directory))
     text = b"100\t1\n200\t2\n"
     buffer = io.BytesIO()
@@ -53,13 +55,38 @@ def prepare_gui_smoke(window, bridge, directory):
               gl.clearColor(1, 0.25, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
               const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
               if (pixel[0] < 200 || pixel[1] < 40) throw new Error('Native WebGL canvas is blank');
+              for (let i = 0; i < 100 && document.querySelector('.welcome-screen'); i++) await wait(100);
+              const visits = document.querySelector('button[aria-label="View global visits"]');
+              if (!visits) throw new Error('Homepage visits control did not render');
+              visits.click();
+              let globe;
+              for (let i = 0; i < 150; i++) {
+                document.querySelector('.visitor-globe-section')?.scrollIntoView({block: 'center'});
+                globe = document.querySelector('.visitor-globe-section canvas');
+                if (globe?.width && globe?.height) break;
+                await wait(100);
+              }
+              if (!globe?.width || !globe?.height) throw new Error('Native engine did not render the actual globe');
+              const snapshot = document.createElement('canvas'); snapshot.width = globe.width; snapshot.height = globe.height;
+              const ctx = snapshot.getContext('2d');
+              let globeColors = 0;
+              for (let frame = 0; frame < 5 && globeColors < 30; frame++) {
+                await new Promise(requestAnimationFrame);
+                ctx.clearRect(0, 0, snapshot.width, snapshot.height);
+                ctx.drawImage(globe, 0, 0);
+                const data = ctx.getImageData(0, 0, snapshot.width, snapshot.height).data;
+                const colors = new Set();
+                for (let i = 0; i < data.length; i += 16) if (data[i + 3] > 100) colors.add(`${data[i] >> 4},${data[i + 1] >> 4},${data[i + 2] >> 4}`);
+                globeColors = colors.size;
+              }
+              if (globeColors < 30) throw new Error('Native globe has no mapped pixels: ' + globeColors);
               for (const [name, encoded] of Object.entries(FIXTURES)) {
                 const bytes = Uint8Array.from(atob(encoded), value => value.charCodeAt(0));
                 const url = URL.createObjectURL(new Blob([bytes]));
                 const anchor = document.createElement('a'); anchor.href = url; anchor.download = name;
                 anchor.click(); URL.revokeObjectURL(url);
               }
-              return {react: true, api: true, webgl2: true, bridge: true};
+              return {react: true, api: true, webgl2: true, globe: true, globe_colors: globeColors, bridge: true};
             })().then(result => {window.__ramancloudNativeSmoke = result;})
                 .catch(error => {window.__ramancloudNativeSmoke = {error: String(error)};});
             """.replace("FIXTURES", fixtures)
