@@ -11,7 +11,7 @@ export default function useChartLayout(base, source) {
     ...base,
     uirevision: revision.current.id,
     font: { ...base.font, color },
-    modebar: { bgcolor: theme === 'dark' ? '#252b35' : '#ffffff', color, activecolor: '#0071e3' },
+    modebar: { bgcolor: 'rgba(0,0,0,0)', color, activecolor: '#0071e3' },
     legend: { ...base.legend, x: 0, y: 1.08, orientation: 'h', bgcolor: 'rgba(0,0,0,0)', font: { color } },
     xaxis: { ...base.xaxis, gridcolor, title: { text: t('wavenumberAxis'), font: { color } } },
     yaxis: { ...base.yaxis, gridcolor, title: { text: t('intensity'), font: { color } } },
