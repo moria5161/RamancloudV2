@@ -95,7 +95,7 @@ export const researchCategories = [
       {
         title: 'Vib2Mol: from vibrational spectra to molecular structures—a unified deep learning framework',
         titleZh: 'Vib2Mol：从振动光谱到分子结构的统一深度学习框架',
-        citation: 'Chem. Sci., 2026, DOI: 10.1039/D6SC04559F',
+        citation: 'Chem. Sci. 2026, Advance Article',
         url: 'https://pubs.rsc.org/sc/article/doi/10.1039/d6sc04559f/1355321/Vib2Mol-from-vibrational-spectra-to-molecular',
         image: 'vib2mol-toc.png',
       },
