@@ -1,39 +1,84 @@
+<div align="center">
+
+<img src="frontend/public/logo-v1.png" alt="RamanCloud logo" width="96">
+
 # RamanCloud
 
-An online workspace for Raman spectral preprocessing.
+**Raman spectral preprocessing, in your browser.**
 
-**[Open RamanCloud](https://ramancloud.xmu.edu.cn/preprocessing/)**
+Cut, denoise, and correct baselines for spectra, time series, and hyperspectral images.
 
-Use the same workspace offline with the [Windows and macOS desktop downloads](https://github.com/moria5161/RamancloudV2/releases/latest). See [desktop setup](DESKTOP.md) for installation.
+[Open RamanCloud](https://ramancloud.xmu.edu.cn/preprocessing/) · [Local Setup](LOCAL_SETUP.md) · [Report an Issue](https://github.com/moria5161/RamancloudV2/issues) · [Apache 2.0](LICENSE)
 
-For agent-driven processing, the [RamanCloud MCP server](MCP.md) exposes the same spectral, hyperspectral, and file tools to Codex and other MCP clients.
+</div>
 
-## Features
+---
 
-- Process individual spectra, time series, and hyperspectral images.
-- Arrange spectral cutting, denoising, and baseline correction in your preferred order.
-- Compare raw and processed data through spectra and heatmaps, and inspect individual spatial pixels or time points.
-- Switch between uploaded spectra and inspect time-series changes in a difference heatmap.
-- Download processed data with optional processing records, split or merge spectral files, and convert between supported instrument formats.
-- Apply one pipeline to multiple uploaded spectra, export batch results, or download baselines separately.
-- Switch between English and Chinese, with light and dark themes.
-- Explore combined country/region visit counts on an interactive globe.
+## Workspace
 
-## Workflow
+| Module | Work with | What you can do |
+| :--- | :--- | :--- |
+| **Spectral Processing** | Individual spectra and batches of up to 512 files | Build a pipeline, compare curves, and export results or baselines. |
+| **Hyperspectral Processing** | Spectral images and time series | Compare heatmaps, inspect spatial pixels or time points, and export coordinate-preserving data. |
+| **Extra Tools** | Spectral and mapping files | Split mappings, merge spectra, and convert supported instrument formats. |
 
-1. Choose **Spectral Processing** or **Hyperspectral Processing**.
-2. Load a demo dataset or upload your data. For time series and imaging, select the matching instrument and data type.
-3. Add processing steps, arrange their order, and adjust the parameters.
-4. Run the pipeline, compare the results, and download the processed data.
+**Your pipeline, your order.** Arrange cutting, denoising, and baseline correction to suit your data, then adjust the available parameters.
 
-Use **Extra Tools** for file operations and **Tutorial** for guidance.
+The workspace includes demo datasets, an in-app tutorial, English and Chinese interfaces, and light and dark themes.
 
-Time-series and imaging downloads use Horiba-style tab-separated files with source coordinates preserved. Select **Horiba** when importing these results again.
+## Getting Started
 
-To run your own copy, see the [local setup guide](LOCAL_SETUP.md).
+1. **Load** a demo or upload your files. For imaging and time series, select the matching instrument and data type.
+2. **Build** your pipeline by adding and ordering processing steps.
+3. **Compare** raw and processed data using interactive spectra and heatmaps.
+4. **Export** results, separate baselines, or a ZIP with processing records.
 
-## Architecture
+Batch exports keep the original filenames. Imaging and time-series exports preserve source coordinates in Horiba-style text files; choose **Horiba** when importing them again.
 
-React and Plotly provide the interactive workspace; FastAPI handles data loading and processing. The desktop app bundles this workspace with a local backend and uses the operating system's WebView. The MCP server calls the same parsers and algorithms directly.
+<details>
+<summary><strong>Available Algorithms</strong></summary>
 
-Developed by Ren Research Group, Xiamen University.
+| Task | Algorithms |
+| :--- | :--- |
+| Denoising | Savitzky-Golay, Wavelet (WTD), PEER, F2P, TSVD |
+| Baseline correction | AirNet, airPLS, AABS, IModPoly, SNIP |
+
+TSVD operates on multiple aligned spectra. AirNet and F2P use pretrained models; F2P is a masked self-supervised algorithm that has not yet been published.
+
+Algorithm descriptions and references are available in the website's **Tutorial**.
+
+</details>
+
+## Run Locally
+
+Use **Python 3.11** and **Node.js 22 or 24** to run your own copy.
+
+The **[Local Setup Guide](LOCAL_SETUP.md)** covers installation, backend and frontend startup, optional model weights, and troubleshooting on Linux, macOS, and Windows.
+
+| Layer | Stack |
+| :--- | :--- |
+| Browser workspace | React, Plotly |
+| Processing API | FastAPI, NumPy, SciPy, PyWavelets, pybaselines |
+
+AirNet and F2P weights are configured on the hosted website and are not included in this repository.
+
+<details>
+<summary><strong>Data Sharing on the Hosted Website</strong></summary>
+
+Original-upload sharing is enabled by default to improve RamanCloud. Disable it in **Settings** before uploading confidential data.
+
+Shared originals are retained until administrators delete them. Turning sharing off affects future uploads only. Demo datasets and processing results are not archived.
+
+</details>
+
+## Contact
+
+Developed by **Ren Research Group, Xiamen University**.
+
+[Website feedback and bug reports](https://github.com/moria5161/RamancloudV2/issues) · [Research inquiries](mailto:bren@xmu.edu.cn)
+
+## License
+
+RamanCloud source code is licensed under the **[Apache License 2.0](LICENSE)**.
+
+Third-party components retain their original licenses. Model weights, datasets, and publication figures are not covered by this software license unless explicitly stated otherwise.
