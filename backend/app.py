@@ -497,7 +497,7 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step], 
         params = step.params or {}
         if current_owner() is not None and step.type == 'denoise' and step.method == 'tsvd':
             rows, columns = current.shape
-            if rows * columns * min(rows, columns) > 10_000_000_000:
+            if rows * columns * min(rows, columns) > 20_000_000_000:
                 raise HTTPException(413, 'TSVD job is too large for online processing. Cut the spectral range or use local processing.')
         if step.type == "cut":
             start = float(params.get("start", current_wn.min()))
