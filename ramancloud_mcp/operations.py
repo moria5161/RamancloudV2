@@ -16,7 +16,8 @@ from .files import FilePlan, input_file
 
 Module = Literal["spectrum", "imaging", "time_series"]
 Instrument = Literal["Horiba", "Nanophoton", "Renishaw"]
-MAX_BATCH = 100
+MAX_BATCH = 512
+MAX_MERGE = 100
 MAX_STEPS = 32
 MAX_BATCH_SUMMARIES = 8
 
@@ -329,8 +330,8 @@ def split_mapping(input_path: str, output_path: str, instrument: Instrument = "H
 
 
 def merge_spectra(input_paths: list[str], output_path: str, overwrite=False):
-    if not 1 <= len(input_paths) <= MAX_BATCH:
-        raise ValueError(f"Merge accepts 1 to {MAX_BATCH} explicit input paths")
+    if not 1 <= len(input_paths) <= MAX_MERGE:
+        raise ValueError(f"Merge accepts 1 to {MAX_MERGE} explicit input paths")
     sources = [input_file(path) for path in input_paths]
     plan = FilePlan(sources, {"merged": output_path}, overwrite)
     content = core().merge_spectrum_files([(source.name, source.read_bytes()) for source in sources])

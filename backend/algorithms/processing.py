@@ -1,10 +1,13 @@
 import numpy as np
-import pywt
-from pybaselines import Baseline
-from scipy.signal import savgol_filter
 
-from .v1_aabs import aabs
-from .v1_peer import peer_process
+from .baseline_cor.aabs import correct_baseline as aabs_correct_baseline
+from .baseline_cor.airpls import airpls
+from .baseline_cor.imodpoly import imodpoly
+from .baseline_cor.snip import snip
+from .denoising.peer import denoise as peer_denoise
+from .denoising.sg import sg
+from .denoising.tsvd import tsvd
+from .denoising.wtd import wtd
 
 
 # Defaults match the V1 parameterized API where that API has an equivalent.
@@ -12,15 +15,17 @@ PARAMETERS = {
     'sg': {'window_size': (7, int, 3, 10001), 'order': (3, int, 0, 20)},
     'wtd': {'wavelet': ('db3', str, None, None), 'level': (3, int, 1, 20)},
     'peer': {'loops': (3, int, 1, 20), 'half_k_threshold': (2, int, 0, 7)},
+    'f2p': {},
     'tsvd': {'threshold': (0.001, float, 0, 100)},
+    'airnet': {},
     'airpls': {'lam': (1e7, float, 1e-12, 1e12), 'diff_order': (3, int, 1, 3)},
     'aabs': {'Ln': (6, int, 2, 100), 'Lb': (140, int, 5, 1000)},
     'imodpoly': {'poly_order': (3, int, 0, 10)},
     'snip': {'max_half_window': (20, int, 1, 1000), 'smooth_half_window': (7, int, 0, 1000)},
     'skip': {},
 }
-DENOISE_METHODS = ('sg', 'wtd', 'peer', 'tsvd', 'skip')
-BASELINE_METHODS = ('airpls', 'aabs', 'imodpoly', 'snip', 'skip')
+DENOISE_METHODS = ('sg', 'wtd', 'peer', 'tsvd', 'f2p', 'skip')
+BASELINE_METHODS = ('airnet', 'airpls', 'aabs', 'imodpoly', 'snip', 'skip')
 
 
 def validated_parameters(method, params):
@@ -65,32 +70,25 @@ def denoise(y, params, method):
     if method == 'skip':
         return y.copy()
     if method == 'sg':
-        if p['window_size'] % 2 != 1 or p['window_size'] > len(y) or p['order'] >= p['window_size']:
-            raise ValueError('SG window must be odd, no longer than the spectrum, and greater than polynomial order')
-        return savgol_filter(y, p['window_size'], p['order'])
+        return sg(y, **p)
     if method == 'wtd':
-        maximum = pywt.dwt_max_level(len(y), pywt.Wavelet(p['wavelet']).dec_len)
-        if p['level'] > maximum:
-            raise ValueError('WTD level exceeds the maximum {} for this spectrum and wavelet'.format(maximum))
-        coeffs = pywt.wavedec(y, p['wavelet'], level=p['level'])
-        threshold = 0.8 * np.sqrt(2 * np.log(len(y))) * np.median(np.abs(coeffs[-1])) / 0.6745
-        coeffs = [c if i == 0 else pywt.threshold(c, threshold, mode='soft') for i, c in enumerate(coeffs)]
-        return pywt.waverec(coeffs, p['wavelet'])[:len(y)]
+        return wtd(y, **p)
     if method == 'peer':
-        if len(y) < 7:
-            raise ValueError('PEER requires at least 7 spectral points')
-        return peer_process(y, np.arange(len(y)), **p)[0].astype(float)
+        return peer_denoise(y, **p)
     return denoise_batch(y.reshape(1, -1), p, method)[0]
 
 
 def denoise_batch(matrix, params, method):
+    if method == 'f2p':
+        validated_parameters(method, params)
+        try:
+            from .denoising.f2p import denoise_batch as f2p_denoise_batch
+        except ImportError as exc:
+            raise ValueError('F2P requires the optional PyTorch dependency; install torch>=2.5,<3.') from exc
+        return f2p_denoise_batch(matrix)
     if method == 'tsvd':
         p = validated_parameters(method, params)
-        u, s, vh = np.linalg.svd(matrix, full_matrices=False)
-        mask = np.ones(len(s), dtype=bool)
-        # Match V1's second derivative of log1p singular values, not a relative-rank cutoff.
-        mask[1:-1] = np.abs(np.diff(np.log1p(s), n=2)) > p['threshold']
-        return (u * np.where(mask, s, 0)) @ vh
+        return tsvd(matrix, **p)
     return np.vstack([denoise(row, params, method) for row in matrix])
 
 
@@ -103,15 +101,26 @@ def correct_baseline(y, params, method):
         return y.copy(), None
     if len(y) < 4 or p.get('poly_order', 0) >= len(y) or p.get('diff_order', 1) >= len(y):
         raise ValueError('Too few spectral points for the baseline parameters')
+    if method == 'airnet':
+        corrected, baseline = correct_baseline_batch(y.reshape(1, -1), p, method)
+        return corrected[0], baseline[0]
     if method == 'aabs':
-        if len(y) < max(100, p['Ln'], p['Lb']):
-            raise ValueError('AABS requires at least max(100, Ln, Lb) spectral points')
-        corrected = aabs(np.arange(len(y)), y.copy(), **p)
-        return corrected, y - corrected
-    fitter = Baseline(x_data=np.linspace(0, len(y), len(y)))
-    if method == 'snip':
-        if p['max_half_window'] > (len(y) - 1) // 2:
-            raise ValueError('SNIP maximum half window exceeds half the spectral length')
-        p['decreasing'] = True
-    baseline, _ = getattr(fitter, method)(y, **p)
-    return y - baseline, baseline
+        return aabs_correct_baseline(y, **p)
+    if method == 'airpls':
+        return airpls(y, **p)
+    if method == 'imodpoly':
+        return imodpoly(y, **p)
+    return snip(y, **p)
+
+
+def correct_baseline_batch(matrix, params, method):
+    if method == 'airnet':
+        validated_parameters(method, params)
+        try:
+            from .baseline_cor.airnet import airnet_process
+        except ImportError as exc:
+            raise ValueError('AirNet requires the optional PyTorch dependency; install ramancloud[airnet].') from exc
+        corrected = airnet_process(matrix)
+        return corrected, matrix - corrected
+    rows = [correct_baseline(row, params, method) for row in matrix]
+    return np.vstack([row[0] for row in rows]), (None if rows[0][1] is None else np.vstack([row[1] for row in rows]))

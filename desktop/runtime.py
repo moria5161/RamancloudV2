@@ -152,6 +152,7 @@ class RuntimeServer:
             os.environ["RAMANCLOUD_ANALYTICS_DIR"] = str(Path(data_directory) / "analytics")
             os.environ["RAMANCLOUD_ANALYTICS_ORIGINS"] = self.origin
             os.environ["RAMANCLOUD_ANALYTICS_TRUSTED_PROXIES"] = ""
+            os.environ["RAMANCLOUD_UPLOAD_ARCHIVE_DISABLED"] = "1"
             if backend is None:
                 from ramancloud_backend.app import app as backend
             self.backend = backend

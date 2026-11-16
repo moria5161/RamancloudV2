@@ -38,12 +38,21 @@ class CountryLookup:
         return maxminddb is not None and self.path.is_file()
 
     def lookup(self, request):
+        return self.resolve(request)[0]
+
+    def resolve(self, request):
         address = client_address(request)
-        if not address or not address.is_global or not self.enabled:
-            return "ZZ"
+        if not address:
+            return "ZZ", "invalid_address"
+        if not address.is_global:
+            return "ZZ", "non_public_address"
+        if not self.enabled:
+            return "ZZ", "database_unavailable"
         try:
             with maxminddb.open_database(str(self.path)) as reader:
                 code = (reader.get(str(address)) or {}).get("country", {}).get("iso_code", "ZZ")
-                return code if isinstance(code, str) and len(code) == 2 and code.isalpha() and code.isupper() else "ZZ"
+                if isinstance(code, str) and len(code) == 2 and code.isalpha() and code.isupper() and code != 'ZZ':
+                    return code, "located"
+                return "ZZ", "not_found"
         except (OSError, ValueError, maxminddb.InvalidDatabaseError):
-            return "ZZ"
+            return "ZZ", "lookup_error"

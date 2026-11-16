@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import VisitorGlobe from './VisitorGlobe';
+import { API_BASE } from '../utils/apiBase';
 
 export default function VisitStatistics() {
   const { language, t } = usePreferences();
@@ -14,7 +15,7 @@ export default function VisitStatistics() {
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
-    fetch(`${import.meta.env.BASE_URL}api/visits/summary`, { signal: controller.signal })
+    fetch(`${API_BASE}/visits/summary`, { signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error(); return response.json(); })
       .then(result => { setData(result); setFailed(false); })
       .catch(error => { if (error.name !== 'AbortError') setFailed(true); })

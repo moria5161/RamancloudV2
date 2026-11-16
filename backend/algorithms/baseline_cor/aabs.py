@@ -1,4 +1,4 @@
-"""Algorithm ported from RamanCloud V1 (baseline_cor/AABS.py)."""
+"""Adaptive automated baseline subtraction."""
 import numpy as np
 
 
@@ -237,3 +237,10 @@ def aabs(wave, y, Ln=6, Lb=140):
     background_smooth = basic_smooth(5, Lb, background)
     res_y -= background_smooth
     return  res_y
+
+
+def correct_baseline(y, Ln, Lb):
+    if len(y) < max(100, Ln, Lb):
+        raise ValueError('AABS requires at least max(100, Ln, Lb) spectral points')
+    corrected = aabs(np.arange(len(y)), y.copy(), Ln=Ln, Lb=Lb)
+    return corrected, y - corrected

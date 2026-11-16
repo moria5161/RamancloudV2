@@ -1,15 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import SettingsPanel from './components/SettingsPanel';
 import { PreferencesProvider, usePreferences } from './i18n';
 import HomePage from './pages/HomePage';
-import SpectralProcessing from './pages/SpectralProcessing';
-import HyperspectralProcessing from './pages/HyperspectralProcessing';
 import ExtraTools from './pages/ExtraTools';
 import Tutorial from './pages/Tutorial';
 import Contributors from './pages/Contributors';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import useVisitTracking from './hooks/useVisitTracking';
+import useSidebarLayout from './hooks/useSidebarLayout';
+
+const SpectralProcessing = lazy(() => import('./pages/SpectralProcessing'));
+const HyperspectralProcessing = lazy(() => import('./pages/HyperspectralProcessing'));
+const SpectrumStructure = lazy(() => import('./pages/SpectrumStructure'));
+const workspacePaths = ['/spectral', '/hyperspectral', '/spectrum-structure'];
 
 function WelcomeScreen() {
   const { language } = usePreferences();
@@ -43,13 +48,15 @@ function WelcomeScreen() {
 }
 
 function AppShell() {
+  const { t } = usePreferences();
   const location = useLocation();
   useVisitTracking(location.pathname);
   const [visitedWorkspaces, setVisitedWorkspaces] = useState([]);
+  const sidebar = useSidebarLayout();
 
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/spectral' || path === '/hyperspectral') {
+    if (workspacePaths.includes(path)) {
       setVisitedWorkspaces(previous => previous.includes(path) ? previous : [...previous, path]);
     }
     const frame = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
@@ -57,12 +64,15 @@ function AppShell() {
   }, [location.pathname]);
 
   return (
-    <div className="app-liquid-bg flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden">
+    <div className="app-liquid-bg flex h-screen overflow-hidden" style={{ '--sidebar-width': `${sidebar.width}px` }} data-sidebar-collapsed={sidebar.collapsed} data-sidebar-overlay={sidebar.overlay}>
+      {sidebar.overlay && <button className="sidebar-backdrop" onClick={sidebar.closeMobile} aria-label={t('closeNavigation')} />}
+      <Sidebar layout={sidebar} />
+      <main className="flex-1 min-w-0 overflow-hidden">
+        <Suspense fallback={<div className="h-full grid place-items-center text-sm text-gray-500" role="status">{t('loadingWorkspace')}</div>}>
         {[
           ['/spectral', SpectralProcessing],
           ['/hyperspectral', HyperspectralProcessing],
+          ['/spectrum-structure', SpectrumStructure],
         ].map(([path, Workspace]) => (
           (visitedWorkspaces.includes(path) || location.pathname === path) && (
             <div key={path} hidden={location.pathname !== path} className="workspace-route h-full overflow-hidden">
@@ -70,16 +80,19 @@ function AppShell() {
             </div>
           )
         ))}
-        <div key={location.pathname} hidden={location.pathname === '/spectral' || location.pathname === '/hyperspectral'} className="route-surface h-full overflow-hidden">
+        <div key={location.pathname} hidden={workspacePaths.includes(location.pathname)} className="route-surface h-full overflow-hidden">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/spectral" element={null} />
             <Route path="/hyperspectral" element={null} />
+            <Route path="/spectrum-structure" element={null} />
             <Route path="/extra-tools" element={<ExtraTools />} />
             <Route path="/tutorial" element={<Tutorial />} />
             <Route path="/contributors" element={<Contributors />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           </Routes>
         </div>
+        </Suspense>
       </main>
       <SettingsPanel />
     </div>
@@ -88,7 +101,7 @@ function AppShell() {
 
 function App() {
   return (
-    <Router basename="/preprocessing">
+    <Router basename={import.meta.env.BASE_URL}>
       <PreferencesProvider>
         <WelcomeScreen />
         <AppShell />

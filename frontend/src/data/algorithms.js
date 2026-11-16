@@ -1,5 +1,5 @@
 const number = (key, value, min, max, label, zh, help, helpZh, step = 1) => ({ key, value, min, max, label, zh, help, helpZh, step });
-const lam = value => number('lam', value, 1e-12, 1e12, 'Lambda', '平滑强度', 'Larger values produce smoother baselines.', '数值越大，基线通常越平滑。', 'any');
+const lam = value => ({ ...number('lam', value, 1e-12, 1e12, 'Lambda', '平滑强度', 'Larger values produce smoother baselines.', '数值越大，基线通常越平滑。', 'any'), scale: 'log' });
 const diff = number('diff_order', 3, 1, 3, 'Difference order', '差分阶数', 'Order of the smoothness penalty; this is not a polynomial degree.', '平滑惩罚的差分阶数，不是多项式阶数。');
 const poly = number('poly_order', 3, 0, 10, 'Polynomial order', '多项式阶数', 'Higher orders fit more complex backgrounds, with a greater risk of fitting peaks.', '高阶适用于复杂背景，但更容易拟合到光谱峰。');
 
@@ -16,7 +16,9 @@ export const algorithms = [
     number('loops', 3, 1, 20, 'Iterations', '迭代次数', 'Number of peak-retaining smoothing passes.', '保留峰形的平滑迭代次数。'),
     number('half_k_threshold', 2, 0, 7, 'Peak seeking', '寻峰参数', 'Controls derivative-based peak rejection; compare peak retention when adjusting it.', '控制基于导数的峰筛选；调节时应比较峰的保留情况。'),
   ] },
+  { id: 'f2p', type: 'denoise', name: 'F2P', fields: [] },
   { id: 'tsvd', type: 'denoise', name: 'TSVD', batchOnly: true, fields: [number('threshold', 0.001, 0, 100, 'Curvature threshold', '曲率阈值', 'Threshold the second derivative of log1p singular values. Requires multiple aligned spectra.', '对 log1p 奇异值的二阶差分设阈值；需要多条波数对齐的光谱。', 'any')] },
+  { id: 'airnet', type: 'baseline', name: 'AirNet', fields: [] },
   { id: 'airpls', type: 'baseline', name: 'airPLS', fields: [lam(1e7), diff] },
   { id: 'aabs', type: 'baseline', name: 'Auto-Adaptive (AABS)', fields: [
     number('Ln', 6, 2, 100, 'Ln', 'Ln', 'Local noise/derivative smoothing window in the auto-adaptive algorithm.', '自适应算法中的局部噪声和导数平滑窗口。'),
@@ -30,3 +32,8 @@ export const algorithms = [
 ];
 
 export const algorithmDefaults = id => Object.fromEntries((algorithms.find(item => item.id === id)?.fields || []).map(field => [field.key, field.value]));
+
+export function stepLogarithmicParameter(field, value, direction) {
+  const current = Number.isFinite(value) && value > 0 ? value : field.value;
+  return Math.min(field.max, Math.max(field.min, Number((current * 10 ** direction).toPrecision(15))));
+}

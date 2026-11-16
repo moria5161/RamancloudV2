@@ -7,7 +7,7 @@ export function createProcessingRecord(source, mode, rawData, result, steps, sta
   return {
     schema_version: 1,
     application: 'RamanCloud',
-    application_version: '2.1.0',
+    application_version: result.application_version || 'unknown',
     processed_at: new Date().toISOString(),
     elapsed_seconds: Number(((performance.now() - started) / 1000).toFixed(3)),
     source_file: source,
@@ -19,7 +19,7 @@ export function createProcessingRecord(source, mode, rawData, result, steps, sta
     steps: pipelineSnapshot(steps),
     data_format: 'Tab-separated text without a header; first column is wavenumber. Remaining columns are intensities, with an optional baseline column for single spectra.',
     effective_steps: result.history,
-    algorithm_note: 'PEER and AABS; pybaselines 1.2.1 airPLS, IModPoly, and SNIP; PyWavelets WTD; NumPy TSVD.',
+    algorithm_note: 'Pretrained Fast2PeakRPE and AirNet inference; PEER and AABS; pybaselines 1.2.1 airPLS, IModPoly, and SNIP; PyWavelets WTD; NumPy TSVD.',
   };
 }
 
@@ -28,7 +28,7 @@ export async function exportArchive(entries, record) {
   for (const [name, blob] of entries) files[name] = new Uint8Array(await blob.arrayBuffer());
   if (record) files['processing-record.json'] = strToU8(JSON.stringify(record, null, 2));
   const bytes = await new Promise((resolve, reject) => zip(files, (error, data) => error ? reject(error) : resolve(data)));
-  saveBlob(new Blob([bytes], { type: 'application/zip' }), 'processed_spectra.zip');
+  saveBlob(new Blob([bytes], { type: 'application/zip' }), 'spectra.zip');
 }
 
 export function saveBlob(blob, filename) {
@@ -48,5 +48,5 @@ export async function exportResult(blob, filename, record, includeRecord) {
     [safeName]: data,
     'processing-record.json': strToU8(JSON.stringify(record, null, 2)),
   }, (error, bytes) => error ? reject(error) : resolve(bytes)));
-  saveBlob(new Blob([archive], { type: 'application/zip' }), `${safeName.replace(/\.[^.]+$/, '')}_with_record.zip`);
+  saveBlob(new Blob([archive], { type: 'application/zip' }), `${safeName.replace(/\.[^.]+$/, '')}.zip`);
 }

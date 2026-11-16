@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { API_BASE } from '../utils/apiBase';
 
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 const STORAGE_KEY = 'ramancloud-visit-session';
-const PATHS = new Set(['/', '/spectral', '/hyperspectral', '/extra-tools', '/tutorial', '/contributors']);
+const PATHS = new Set(['/', '/spectral', '/hyperspectral', '/spectrum-structure', '/extra-tools', '/tutorial', '/contributors', '/privacy-policy']);
 
 export default function useVisitTracking(path) {
   const navigation = useRef(null);
@@ -23,7 +24,7 @@ export default function useVisitTracking(path) {
       fallback.current = session;
       try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session)); } catch { /* Keep an in-memory session. */ }
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}api/visits/pageview`, {
+        const response = await fetch(`${API_BASE}/visits/pageview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
           body: JSON.stringify({ ...event, session_id: session.id }),
         });

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Upload, FileUp } from 'lucide-react';
+import { Activity, Upload, FileUp } from 'lucide-react';
 import SpectralChart, { CompareChart } from '../components/SpectralChart';
 import ControlPanel from '../components/ControlPanel';
 import ControlDock from '../components/ControlDock';
@@ -8,9 +8,15 @@ import { usePreferences } from '../i18n';
 import useWorkspaceTask from '../hooks/useWorkspaceTask';
 import WorkspaceFeedback from '../components/WorkspaceFeedback';
 import { createProcessingRecord, exportResult, exportArchive, pipelineSignature } from '../utils/processingRecord';
+import ChartViewport from '../components/ChartViewport';
+import { pipelineIssues } from '../utils/pipelineValidation';
+import { MAX_SPECTRA, processSpectralBatch } from '../utils/spectralBatch';
+import { originalDownloadName } from '../utils/exportNames';
+import { prepareBatchDownload } from '../utils/spectralDownload';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+import { API_BASE } from '../utils/apiBase';
 const DEMOS = ['bacteria', 'ulf', 'tutorial'];
+const DEMO_FILENAMES = { bacteria: 'Bacteria.txt', ulf: 'ULF.txt', tutorial: 'tutorial_raman.txt' };
 
 export default function SpectralProcessing() {
   const { t } = usePreferences();
@@ -24,7 +30,7 @@ export default function SpectralProcessing() {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('overlay');
   const fileInputRef = useRef(null);
-  const task = useWorkspaceTask(t);
+  const task = useWorkspaceTask(t, () => handleProcess());
   const [runRecord, setRunRecord] = useState(null);
   const [includeRecord, setIncludeRecord] = useState(true);
   const [uploadedSpectra, setUploadedSpectra] = useState([]);
@@ -55,7 +61,7 @@ export default function SpectralProcessing() {
     if (!name || task.busy) return;
     setError(null);
     task.run('readingData', async () => {
-      const { data: res } = await axios.get(`${API_BASE}/api/demo/${name}`);
+      const { data: res } = await axios.get(`${API_BASE}/demo/${name}`);
       if (res.code !== 0) throw new Error(res.msg);
       setUploadedSpectra([]);
       setSelectedSpectrum(0);
@@ -67,39 +73,50 @@ export default function SpectralProcessing() {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (!files.length || task.busy) return;
+    if (uploadedSpectra.length + files.length > MAX_SPECTRA) {
+      task.setError(null);
+      setError(t('batchLimitExceeded'));
+      return;
+    }
     setError(null);
     task.run('uploadingData', async ({ uploadProgress }) => {
       const formData = new FormData();
+      formData.append('share_data', 'true');
       files.forEach(file => formData.append('files', file));
-      const { data: res } = await axios.post(`${API_BASE}/api/upload`, formData, { onUploadProgress: uploadProgress });
+      const { data: res } = await axios.post(`${API_BASE}/upload`, formData, { onUploadProgress: uploadProgress });
       if (res.code !== 0 || !res.data.spectra.length) throw new Error(res.msg || 'Upload failed');
       const spec = res.data.spectra[0];
-      setUploadedSpectra(res.data.spectra);
-      setSelectedSpectrum(0);
-      applyData(spec, spec.filename);
+      setUploadedSpectra([...uploadedSpectra, ...res.data.spectra]);
+      if (!uploadedSpectra.length) {
+        setSelectedSpectrum(0);
+        applyData(spec, spec.filename);
+      }
+      if (res.data_sharing?.status === 'failed') setError(t('archiveFailed'));
     });
   };
 
   const handleProcess = () => {
-    if (!rawData || !steps.length || task.busy) return;
+    if (!rawData || !steps.length || task.busy || Object.keys(pipelineIssues(steps, rawData.wavenumber)).length) return;
     setError(null);
-    task.run('processing', async () => {
+    task.run('processing', async ({ setProgress }) => {
       setIsProcessing(true);
       const started = performance.now();
       try {
         if (processAll && uploadedSpectra.length > 1) {
           const snapshot = JSON.parse(pipelineSignature(steps));
-          const { data: res } = await axios.post(`${API_BASE}/api/process-batch`, { spectra: uploadedSpectra, steps: snapshot });
-          if (res.code !== 0) throw new Error(res.msg);
-          const records = res.data.spectra.map((result, index) => createProcessingRecord(result.filename, 'spectrum', uploadedSpectra[index], result, steps, started));
-          setBatchResult({ spectra: res.data.spectra, records, signature: pipelineSignature(steps) });
-          const result = res.data.spectra[selectedSpectrum];
+          const spectra = await processSpectralBatch(uploadedSpectra, snapshot, async payload => {
+            const { data } = await axios.post(`${API_BASE}/process-batch`, payload);
+            return data;
+          }, setProgress);
+          const records = spectra.map((result, index) => createProcessingRecord(result.filename, 'spectrum', uploadedSpectra[index], result, snapshot, started));
+          setBatchResult({ spectra, records, signature: pipelineSignature(snapshot) });
+          const result = spectra[selectedSpectrum];
           setProcessedData(result);
           setBaselineData(result.baseline);
           setRunRecord(records[selectedSpectrum]);
           return;
         }
-        const { data: res } = await axios.post(`${API_BASE}/api/process`, {
+        const { data: res } = await axios.post(`${API_BASE}/process`, {
           wavenumber: rawData.wavenumber, intensity: rawData.intensity,
           steps: JSON.parse(pipelineSignature(steps)),
         });
@@ -114,26 +131,19 @@ export default function SpectralProcessing() {
   const handleDownloadBaseline = () => {
     if (!baselineData || isStale || task.busy) return;
     task.run('preparingDownload', async () => {
-      const filename = `baseline_${(fileName || demoName || 'spectrum').replace(/\.[^.]+$/, '')}.txt`;
-      const { data } = await axios.post(`${API_BASE}/api/download`, { wavenumber: processedData.wavenumber, intensity: baselineData, filename }, { responseType: 'blob' });
+      const filename = originalDownloadName(fileName || DEMO_FILENAMES[demoName]);
+      const { data } = await axios.post(`${API_BASE}/download`, { wavenumber: processedData.wavenumber, intensity: baselineData, filename }, { responseType: 'blob' });
       await exportResult(data, filename, { ...runRecord, data_kind: 'baseline', columns: ['wavenumber', 'baseline'] }, includeRecord);
     });
   };
 
   const handleBatchDownload = () => {
-    if (!batchResult || batchResult.signature !== pipelineSignature(steps) || task.busy) return;
-    task.run('preparingDownload', async () => {
-      const entries = [];
-      for (let index = 0; index < batchResult.spectra.length; index += 1) {
-        const result = batchResult.spectra[index];
-        const name = `${index + 1}_${result.filename.replace(/[\\/]/g, '_').replace(/\.[^.]+$/, '')}.txt`;
-        const { data } = await axios.post(`${API_BASE}/api/download`, { wavenumber: result.wavenumber, intensity: result.intensity }, { responseType: 'blob' });
-        entries.push([`spectra/${name}`, data]);
-        if (result.baseline) {
-          const response = await axios.post(`${API_BASE}/api/download`, { wavenumber: result.wavenumber, intensity: result.baseline }, { responseType: 'blob' });
-          entries.push([`baselines/${name}`, response.data]);
-        }
-      }
+    if (!batchResult || batchResult.spectra.length !== uploadedSpectra.length || batchResult.signature !== pipelineSignature(steps) || task.busy) return;
+    task.run('preparingDownload', async ({ setProgress }) => {
+      const entries = await prepareBatchDownload(batchResult.spectra, async payload => {
+        const { data } = await axios.post(`${API_BASE}/download-batch`, payload);
+        return data;
+      }, setProgress);
       await exportArchive(entries, includeRecord ? batchResult.records : null);
     });
   };
@@ -141,8 +151,8 @@ export default function SpectralProcessing() {
   const handleDownload = () => {
     if (!processedData || isStale || task.busy) return;
     task.run('preparingDownload', async () => {
-      const filename = `processed_${(fileName || demoName || 'spectrum').replace(/\.[^.]+$/, '')}.txt`;
-      const { data } = await axios.post(`${API_BASE}/api/download`, {
+      const filename = originalDownloadName(fileName || DEMO_FILENAMES[demoName]);
+      const { data } = await axios.post(`${API_BASE}/download`, {
         wavenumber: processedData.wavenumber, intensity: processedData.intensity,
         baseline: baselineData, filename,
       }, { responseType: 'blob' });
@@ -170,6 +180,39 @@ export default function SpectralProcessing() {
     setSelectedSpectrum(0);
   };
 
+  const handleSpectrumRemove = index => {
+    if (task.busy || !uploadedSpectra[index]) return;
+    if (uploadedSpectra.length === 1) {
+      handleClear();
+      return;
+    }
+    const remaining = uploadedSpectra.filter((_, position) => position !== index);
+    // Cached results cover a prefix of the uploads when more files were appended.
+    const spectra = batchResult?.spectra.filter((_, position) => position !== index);
+    const nextBatch = spectra?.length ? {
+      ...batchResult,
+      spectra,
+      records: batchResult.records.filter((_, position) => position !== index),
+    } : null;
+    const nextIndex = index < selectedSpectrum ? selectedSpectrum - 1
+      : Math.min(selectedSpectrum, remaining.length - 1);
+    setUploadedSpectra(remaining);
+    setSelectedSpectrum(nextIndex);
+    setBatchResult(nextBatch);
+    if (remaining.length < 2) setProcessAll(false);
+    if (index === selectedSpectrum) {
+      const source = remaining[nextIndex];
+      const result = nextBatch?.spectra[nextIndex];
+      setRawData({ wavenumber: source.wavenumber, intensity: source.intensity });
+      setFileName(source.filename);
+      setProcessedData(result || null);
+      setBaselineData(result?.baseline || null);
+      setRunRecord(nextBatch?.records[nextIndex] || null);
+    }
+    setError(null);
+    task.setError(null);
+  };
+
   const hasData = rawData !== null;
 
   return (
@@ -179,7 +222,7 @@ export default function SpectralProcessing() {
       <div className="workspace-visual-surface flex-1 flex flex-col min-w-0 relative">
         <div className="workspace-toolbar flex items-center justify-between px-5 py-3 border-b border-white/5 glass">
           <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <Activity className="w-4 h-4 shrink-0 text-indigo-400" />
             <h2 className="text-sm font-semibold text-gray-200">{t('spectralWorkspace')}</h2>
           </div>
           <div className="flex items-center gap-2">
@@ -194,12 +237,12 @@ export default function SpectralProcessing() {
               disabled={task.busy} onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-all flex items-center gap-1"
             >
-              <Upload className="w-3 h-3" /> {t('upload')}
+              <Upload className="w-3 h-3" /> {t(uploadedSpectra.length ? 'addFiles' : 'upload')}
             </button>
           </div>
         </div>
 
-        <div className="spectral-visual-stage flex-1 p-4 overflow-hidden">
+        <div className="spectral-visual-stage flex-1 min-h-0 p-4 overflow-hidden">
           {!hasData ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-6 animate-fade-in">
@@ -221,11 +264,11 @@ export default function SpectralProcessing() {
             </div>
           ) : (
             <div className="h-full animate-fade-in">
-              {viewMode === 'overlay' || !processedData ? (
-                <SpectralChart rawData={rawData} processedData={processedData} baselineData={baselineData} cutRange={cutRange} height={window.innerHeight - 140} showRaw={true} />
+              <ChartViewport>{height => viewMode === 'overlay' || !processedData ? (
+                <SpectralChart rawData={rawData} processedData={processedData} baselineData={baselineData} cutRange={cutRange} height={height} showRaw={true} />
               ) : (
-                <CompareChart rawData={rawData} processedData={processedData || rawData} height={window.innerHeight - 140} />
-              )}
+                <CompareChart rawData={rawData} processedData={processedData || rawData} height={height} />
+              )}</ChartViewport>
               <div className="absolute bottom-16 left-8 flex gap-2">
                 {processedData && <span className="px-2 py-1 text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{isStale ? t('resultStale') : t('processed')}</span>}
                 {baselineData && <span className="px-2 py-1 text-[10px] rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">{t('baselineCorrected')}</span>}
@@ -257,7 +300,8 @@ export default function SpectralProcessing() {
           processAll={processAll} onProcessAllChange={setProcessAll}
           hasBaseline={!!baselineData} onDownloadBaseline={handleDownloadBaseline}
           hasBatchResult={!!batchResult} onBatchDownload={handleBatchDownload}
-          batchStale={!!batchResult && batchResult.signature !== pipelineSignature(steps)}
+          batchStale={!!batchResult && (batchResult.spectra.length !== uploadedSpectra.length || batchResult.signature !== pipelineSignature(steps))}
+          onSpectrumRemove={handleSpectrumRemove}
           onSpectrumChange={index => {
             if (task.busy || !uploadedSpectra[index]) return;
             setSelectedSpectrum(index);
@@ -272,6 +316,7 @@ export default function SpectralProcessing() {
             setRunRecord(batchResult?.records[index] || null);
           }}
           cutRange={cutRange}
+          wavenumber={rawData?.wavenumber}
         />
       </ControlDock>
 

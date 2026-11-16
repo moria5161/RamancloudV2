@@ -63,7 +63,7 @@ class VisitStatisticsTests(unittest.TestCase):
         with sqlite3.connect(self.store.path) as connection:
             columns = [row[1] for row in connection.execute("PRAGMA table_info(pageviews)")]
             row = connection.execute("SELECT * FROM pageviews").fetchone()
-        self.assertEqual(columns, ["event_id", "session_hash", "path", "occurred_at", "day", "country"])
+        self.assertEqual(columns, ["event_id", "session_hash", "path", "occurred_at", "day", "country", "country_reason"])
         self.assertNotIn(str(self.session), row)
         self.assertEqual(os.stat(self.store.path).st_mode & 0o777, 0o600)
 
@@ -159,6 +159,37 @@ class VisitStatisticsTests(unittest.TestCase):
                 with self.assertRaises(HTTPException) as error:
                     record_pageview(self.event(), self.request(origin="https://ramancloud.xmu.edu.cn"))
             self.assertEqual(error.exception.status_code, 503)
+
+    def test_unknown_reasons_are_aggregated_without_addresses(self):
+        self.store.record(self.event(), self.now, country_reason='non_public_address')
+        self.store.record(self.event(), self.now, country_reason='not_found')
+        self.store.record(self.event(), self.now, country='CN', country_reason='located')
+        summary = self.store.summary(now=self.now)
+        self.assertEqual(summary['geolocation']['unknown_reasons'], {'non_public_address': 1, 'not_found': 1})
+        self.assertEqual(summary['recorded']['pageviews'], 3)
+
+    def test_private_addresses_and_missing_database_have_distinct_reasons(self):
+        lookup = CountryLookup(self.store.directory)
+        request = lambda peer: Request({'type': 'http', 'client': (peer, 1234), 'headers': []})
+        self.assertEqual(lookup.resolve(request('192.168.1.2')), ('ZZ', 'non_public_address'))
+        self.assertEqual(lookup.resolve(request('8.8.8.8')), ('ZZ', 'database_unavailable'))
+
+    def test_country_lookup_success_missing_record_and_corrupt_database(self):
+        from unittest.mock import MagicMock
+        import visit_geolocation
+        request = Request({'type': 'http', 'client': ('8.8.8.8', 1234), 'headers': []})
+        lookup = CountryLookup(self.store.directory)
+        lookup.path.parent.mkdir(parents=True)
+        lookup.path.touch()
+        reader = MagicMock()
+        reader.__enter__.return_value = reader
+        reader.get.return_value = {'country': {'iso_code': 'US'}}
+        with patch.object(visit_geolocation.maxminddb, 'open_database', return_value=reader):
+            self.assertEqual(lookup.resolve(request), ('US', 'located'))
+            reader.get.return_value = {}
+            self.assertEqual(lookup.resolve(request), ('ZZ', 'not_found'))
+        with patch.object(visit_geolocation.maxminddb, 'open_database', side_effect=OSError('unreadable')):
+            self.assertEqual(lookup.resolve(request), ('ZZ', 'lookup_error'))
 
     def test_rate_limit(self):
         for _ in range(240):

@@ -18,6 +18,18 @@ export const algorithmReferences = [
     zh: '在降噪中提取并保留峰。',
   },
   {
+    id: 'f2p', group: 'denoise', name: 'F2P',
+    url: 'https://arxiv.org/abs/2610.29753',
+    en: 'Fast2Peak (F2P) is a masked self-supervised algorithm and has not yet been published.',
+    zh: 'Fast2Peak(F2P)算法是一种掩码自监督算法，目前暂未发表。',
+  },
+  {
+    id: 'airnet', group: 'baseline', name: 'AirNet',
+    url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.6c01550',
+    en: 'Deep learning-based baseline correction.',
+    zh: '基于深度学习的基线校正算法。',
+  },
+  {
     id: 'airpls', group: 'baseline', name: 'airPLS',
     url: 'https://doi.org/10.1039/B922045C',
     en: 'Adaptive reweighted penalized least squares, implemented with pybaselines.',

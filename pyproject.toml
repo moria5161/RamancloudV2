@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "Ren Research Group, Xiamen University"}]
 dependencies = [
-  "fastapi>=0.115,<0.120",
+  "fastapi==0.162.0",
+  "starlette==1.3.1",
   "uvicorn>=0.30,<0.35",
   "python-multipart>=0.0.18",
   "pydantic>=2.11,<3",
@@ -23,9 +24,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+airnet = ["torch>=2.5,<3"]
+models = ["torch>=2.5,<3"]
 mcp = ["mcp>=1.26,<2", "sse-starlette>=2.1,<3.1"]
 desktop = ["pywebview>=6,<7"]
-dev = ["pytest>=8,<9", "httpx>=0.27,<1", "build>=1.2,<2", "pyinstaller>=6.16,<7"]
+dev = ["pytest>=9.0.3,<10", "httpx>=0.27,<1", "build>=1.2,<2", "pyinstaller>=6.16,<7"]
 
 [project.scripts]
 ramancloud-mcp = "ramancloud_mcp.server:main"
@@ -37,7 +40,17 @@ Repository = "https://github.com/moria5161/RamancloudV2"
 Issues = "https://github.com/moria5161/RamancloudV2/issues"
 
 [tool.setuptools]
-packages = ["ramancloud_backend", "ramancloud_backend.algorithms", "ramancloud_mcp", "desktop"]
+packages = [
+  "ramancloud_backend",
+  "ramancloud_backend.algorithms",
+  "ramancloud_backend.algorithms.baseline_cor",
+  "ramancloud_backend.algorithms.denoising",
+  "ramancloud_backend.algorithms.denoising.f2p",
+  "ramancloud_backend.algorithms.structure_spectrum",
+  "ramancloud_backend.algorithms.structure_spectrum.modules",
+  "ramancloud_mcp",
+  "desktop",
+]
 include-package-data = false
 
 [tool.setuptools.package-dir]
@@ -47,7 +60,9 @@ ramancloud_mcp = "ramancloud_mcp"
 desktop = "desktop"
 
 [tool.setuptools.package-data]
-ramancloud_backend = ["samples/*.txt", "historical_visits.json"]
+ramancloud_backend = ["samples/*.txt", "historical_visits.json", "requirements*.txt"]
+"ramancloud_backend.algorithms.denoising.f2p" = ["config.json"]
+"ramancloud_backend.algorithms.structure_spectrum" = ["samples/*.xyz"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "tests"]

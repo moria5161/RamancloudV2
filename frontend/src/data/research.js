@@ -38,6 +38,20 @@ export const researchCategories = [
     labelKey: 'researchDenoising',
     papers: [
       {
+        title: 'Fast2Peak: High-Fidelity Restoration Algorithm by Single-Pixel Masking towards Real-Time Spectral Measurements',
+        titleZh: 'Fast2Peak：面向实时光谱测量的单像素掩蔽高保真复原算法',
+        citation: 'arXiv:2610.29753 (2026), preprint',
+        url: 'https://arxiv.org/abs/2610.29753',
+        image: 'fast2peak-toc.png',
+      },
+      {
+        title: 'AirNet: A Deep Learning-Driven Auto Baseline Correction Algorithm Balancing Global Smoothness and Local Fidelity',
+        titleZh: 'AirNet：兼顾全局平滑与局部保真度的深度学习自动基线校正算法',
+        citation: 'Anal. Chem. 2026, 98, 24, 18042-18051',
+        url: 'https://pubs.acs.org/doi/10.1021/acs.analchem.6c01550',
+        image: 'airnet-toc.png',
+      },
+      {
         title: 'Signal2signal: Pushing the Spatiotemporal Resolution to the Limit by Single Chemical Hyperspectral Imaging',
         titleZh: 'Signal2signal：通过单次化学高光谱成像推进时空分辨率极限',
         citation: 'Anal. Chem. 2024, 96, 17, 6550-6557',
@@ -71,6 +85,13 @@ export const researchCategories = [
         citation: 'Anal. Chem. 2021, 93, 44, 14609-14617',
         url: 'https://doi.org/10.1021/acs.analchem.1c02071',
         image: 'deno_sr2.jpeg',
+      },
+      {
+        title: 'Automated weak signal extraction of hyperspectral Raman imaging data by adaptive low-rank matrix approximation',
+        titleZh: '通过自适应低秩矩阵近似自动提取高光谱拉曼成像数据中的弱信号',
+        citation: 'J. Raman Spectrosc. 2020, 51, 12, 2552-2561',
+        url: 'https://doi.org/10.1002/jrs.6024',
+        image: 'alrma-toc.png',
       },
       {
         title: 'Deep Learning for Biospectroscopy and Biospectral Imaging: State-of-the-Art and Perspectives',

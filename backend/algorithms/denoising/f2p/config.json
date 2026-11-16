@@ -1,0 +1,7 @@
+{
+  "spectrum_length": 1600,
+  "patch_size": 16,
+  "embed_dim": 256,
+  "depth": 8,
+  "heads": 8
+}

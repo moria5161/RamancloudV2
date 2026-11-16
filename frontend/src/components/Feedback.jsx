@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Github, Globe2, Mail, MessageSquare } from 'lucide-react';
+import { Github, Globe2, Mail, MapPin, Phone } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import VisitStatistics from './VisitStatistics';
 
@@ -9,20 +9,26 @@ export default function Feedback() {
   const [showVisits, setShowVisits] = useState(false);
   return (
     <section id="feedback" aria-labelledby="feedback-heading" className="border-t border-white/10 pt-8 pb-4 space-y-4">
-      <h2 id="feedback-heading" className="text-lg font-semibold text-gray-200">{isZh ? '反馈' : 'Feedback'}</h2>
+      <h2 id="feedback-heading" className="text-lg font-semibold text-gray-200">{isZh ? '联系与反馈' : 'Contact & Feedback'}</h2>
       <p className="text-sm text-gray-400">
-        {isZh ? '遇到问题或有建议？欢迎通过邮件联系我们，或在 GitHub 提交反馈。' : 'Questions, issues, or suggestions? Contact us by email or share your feedback on GitHub.'}
+        {isZh ? '欢迎联系团队开展科研合作，或通过邮件和 GitHub 反馈网站问题与建议。' : 'Contact the team for research collaboration, or share website questions and suggestions by email or on GitHub.'}
       </p>
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-        <a href="mailto:xinyulu@stu.xmu.edu.cn" className="liquid-button inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm text-indigo-400">
-          <Mail className="w-4 h-4" />{isZh ? '邮件联系' : 'Email us'}
-        </a>
-        <a href="https://github.com/moria5161/RamancloudV2/issues/new" target="_blank" rel="noopener noreferrer"
-          className="liquid-button inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm text-indigo-400">
-          <MessageSquare className="w-4 h-4" />{isZh ? '提交反馈' : 'Report an issue'}
-        </a>
+      <div className="space-y-2 text-sm text-gray-400">
+        <p className="flex items-start gap-2">
+          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-gray-500" />
+          <span>{isZh ? '厦门大学化学系 434 室，厦门 361005，中国' : 'Room 434, Department of Chemistry, Xiamen University, Xiamen 361005, China'}</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <a href="tel:+865922186532" className="inline-flex items-center gap-2 hover:text-indigo-400 transition-colors">
+            <Phone className="w-3.5 h-3.5 shrink-0 text-gray-500" /> +86-592-2186532
+          </a>
+          <a href="mailto:bren@xmu.edu.cn" className="inline-flex flex-wrap items-center gap-2 hover:text-indigo-400 transition-colors">
+            <Mail className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+            <span>{isZh ? '科研合作：' : 'Research inquiries:'}</span><span>bren@xmu.edu.cn</span>
+          </a>
         </div>
+      </div>
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
         <button type="button"
           title={isZh ? '查看全球访问分布' : 'View global visits'}

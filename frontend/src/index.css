@@ -222,10 +222,47 @@ html, body, #root {
 }
 
 .sidebar-glass {
+  width: var(--sidebar-width, 240px);
   background:
     linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.42)),
     rgba(255,255,255,0.46);
 }
+
+.sidebar-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--rc-secondary);
+}
+.sidebar-toggle:hover { color: var(--rc-blue); background: var(--rc-elevated); }
+.sidebar-footer { padding: 16px 60px 16px 16px; }
+.sidebar-glass.is-collapsed .sidebar-label { display: none; }
+.sidebar-glass.is-collapsed .sidebar-brand { padding: 12px 8px; }
+.sidebar-glass.is-collapsed .sidebar-brand-row { flex-direction: column; gap: 12px; }
+.sidebar-glass.is-collapsed nav { padding: 8px; }
+.sidebar-glass.is-collapsed .nav-liquid { padding: 12px 0; justify-content: center; }
+.sidebar-glass.is-collapsed .sidebar-footer { padding: 16px 20px 72px; }
+.sidebar-glass > .sidebar-resize-handle {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 6px;
+  z-index: 20;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 2px;
+  background: transparent;
+}
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle:focus-visible::after,
+.sidebar-glass.is-resizing .sidebar-resize-handle::after { background: var(--rc-blue); }
+.app-liquid-bg:has(.sidebar-glass.is-resizing) { cursor: col-resize; user-select: none; }
 
 :root[data-theme="dark"] .sidebar-glass {
   background:
@@ -263,6 +300,19 @@ html, body, #root {
 }
 
 .workspace-route[hidden] { display: none; }
+.structure-module-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.structure-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--rc-secondary); }
+.structure-tab.is-active { color: var(--rc-blue); background: rgba(0, 113, 227, 0.1); }
+.structure-module-tabs,
+.structure-view-tabs,
+.structure-visual-surface { background: var(--rc-surface-solid); }
+.structure-editor-frame { display: block; width: 100%; height: 100%; min-height: 450px; border: 0; }
+.structure-editor-frame[hidden] { display: none; }
+.molecule-viewer { position: relative; width: 100%; height: 100%; min-height: 300px; }
+.molecule-canvas { position: absolute; inset: 0; }
+.molecule-canvas canvas { display: block; width: 100%; height: 100%; }
+.molecule-tool { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--rc-secondary); background: var(--rc-elevated); }
+.molecule-tool:hover { color: var(--rc-blue); }
 .workspace-busy {
   position: absolute;
   inset: 0;
@@ -318,24 +368,28 @@ button:disabled:hover { transform: none; }
   color: var(--rc-secondary);
 }
 .control-dock > div[hidden] { display: none; }
+.hyperspectral-chart-stage { min-height: 280px; }
+.workspace-toolbar, .workspace-visual-surface > p { flex-shrink: 0; }
+.workspace-visual-surface > div:last-child:not(.spectral-visual-stage):not(.hyperspectral-visual-stage) { flex-shrink: 0; }
+.step-header button { min-width: 24px; min-height: 28px; display: grid; place-items: center; }
+.upload-dialog { width: min(360px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 8px; background: var(--rc-surface-solid); color: var(--rc-text); }
+.upload-dialog::backdrop { background: rgba(0, 0, 0, 0.28); }
 .workspace-toolbar { flex-wrap: wrap; gap: 8px; }
 .workspace-route .text-center > .flex { flex-wrap: wrap; }
 .workspace-route .text-center { max-width: 100%; }
 @media (max-width: 760px) {
-  .sidebar-glass { width: 56px; }
-  .sidebar-label { display: none; }
-  .sidebar-brand { padding: 12px 10px; }
-  .sidebar-glass nav { padding: 8px; }
-  .sidebar-glass .nav-liquid { padding: 12px; justify-content: center; }
-  .sidebar-glass .nav-liquid svg { flex-shrink: 0; }
-  .sidebar-footer { padding: 16px 20px 72px; }
-  .app-liquid-bg .settings-dock { left: 7px; bottom: 12px; }
-  .app-liquid-bg .settings-popover { left: 0; }
+  .app-liquid-bg { padding-left: 56px; }
+  .app-liquid-bg > .sidebar-glass { position: absolute; inset: 0 auto 0 0; }
+  .app-liquid-bg[data-sidebar-overlay="true"] > .sidebar-glass { z-index: 40; background: var(--rc-surface-solid); }
+  .sidebar-backdrop { position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.2); }
+  .app-liquid-bg[data-sidebar-overlay="true"] > .settings-dock { z-index: 50; }
   .control-dock.is-open { position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; width: 300px; max-width: calc(100% - 24px); }
   .workspace-toolbar { padding: 12px; }
   .workspace-toolbar > div { flex-wrap: wrap; }
   .workspace-route .text-center > .flex { gap: 8px; }
   .workspace-error { flex-wrap: wrap; }
+  .control-dock.is-open > div > .glass { background: var(--rc-surface-solid); }
+  .step-header button { min-width: 28px; min-height: 32px; }
 }
 
 .nav-liquid::after,
@@ -500,6 +554,14 @@ select {
   color: var(--rc-text) !important;
 }
 
+select { color-scheme: light; }
+:root[data-theme="dark"] select { color-scheme: dark; }
+select option,
+select optgroup {
+  background-color: var(--rc-surface-solid);
+  color: var(--rc-text);
+}
+
 button {
   cursor: pointer;
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.22s ease, box-shadow 0.22s ease;
@@ -538,7 +600,7 @@ a:active {
 
 .settings-dock {
   position: fixed;
-  left: 196px;
+  left: calc(var(--sidebar-width, 240px) - 50px);
   bottom: 22px;
   z-index: 30;
   display: flex;
@@ -546,6 +608,8 @@ a:active {
   align-items: center;
   width: 42px;
 }
+
+.app-liquid-bg[data-sidebar-collapsed="true"] .settings-dock { left: 7px; bottom: 12px; }
 
 .settings-trigger {
   width: 42px;
@@ -558,9 +622,10 @@ a:active {
 
 .settings-popover {
   position: absolute;
-  left: -162px;
+  left: max(-218px, calc(62px - var(--sidebar-width, 240px)));
   bottom: 54px;
   width: 260px;
+  max-width: calc(100vw - 24px);
 }
 
 .segmented-control {
@@ -642,6 +707,17 @@ a:active {
 :root[data-theme="dark"] input,
 :root[data-theme="dark"] select {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.logarithmic-parameter {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.logarithmic-parameter::-webkit-inner-spin-button,
+.logarithmic-parameter::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 button:focus-visible,

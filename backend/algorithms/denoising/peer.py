@@ -1,4 +1,4 @@
-"""Algorithm ported from RamanCloud V1 (denoising/PEER.py)."""
+"""Peak extraction and retention denoising."""
 from __future__ import division
 import numpy as np
 import copy
@@ -229,3 +229,9 @@ def peer_process(spectrum, wavenumbers, loops=6, half_k_threshold=3):
     denoised_spectrum = np.array(denoised_spectrum, dtype=np.float32)
 
     return denoised_spectrum, wavenumbers
+
+
+def denoise(y, loops, half_k_threshold):
+    if len(y) < 7:
+        raise ValueError('PEER requires at least 7 spectral points')
+    return peer_process(y, np.arange(len(y)), loops=loops, half_k_threshold=half_k_threshold)[0].astype(float)

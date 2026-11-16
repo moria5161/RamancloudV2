@@ -2,10 +2,11 @@
 RamanCloud preprocessing API.
 
 FastAPI service for spectrum, time-series, and hyperspectral Raman preprocessing.
-The original Streamlit site remains untouched in /media/ramancloud.
+The legacy Streamlit site runs independently in /media/ramancloud.
 """
 
 import io
+import os
 import re
 import uuid
 import zipfile
@@ -23,11 +24,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel, Field
 if __package__:
+    from .version import APPLICATION_VERSION
+    from .web_security import WebSecurityMiddleware, current_owner, web_security_enabled, MAX_BODY_BYTES, MAX_NUMERIC_VALUES
+    from .upload_archive import archive_uploads
     from .visit_statistics import router as visit_statistics_router
-    from .algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
+    from .structure_routes import router as structure_router
+    from .algorithms.processing import denoise, denoise_batch, correct_baseline, correct_baseline_batch, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
 else:
+    from version import APPLICATION_VERSION
+    from web_security import WebSecurityMiddleware, current_owner, web_security_enabled, MAX_BODY_BYTES, MAX_NUMERIC_VALUES
+    from upload_archive import archive_uploads
     from visit_statistics import router as visit_statistics_router
-    from algorithms.processing import denoise, denoise_batch, correct_baseline, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
+    from structure_routes import router as structure_router
+    from algorithms.processing import denoise, denoise_batch, correct_baseline, correct_baseline_batch, validated_parameters, DENOISE_METHODS, BASELINE_METHODS
 
 
 ROOT = Path(__file__).resolve().parent
@@ -35,17 +44,22 @@ SAMPLES = ROOT / "samples"
 
 app = FastAPI(
     title="RamanCloud Preprocessing API",
-    version="2.1.0",
+    version=APPLICATION_VERSION,
     description="Cut, denoise, and baseline-correct Raman spectra and spectral cubes.",
+    docs_url=None if web_security_enabled() else '/docs',
+    redoc_url=None if web_security_enabled() else '/redoc',
+    openapi_url=None if web_security_enabled() else '/openapi.json',
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get('RAMANCLOUD_WEB_ORIGINS', 'https://ramancloud.xmu.edu.cn,http://localhost:5173,http://127.0.0.1:5173').split(','),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allow_headers=['Content-Type', 'X-RamanCloud-CSRF', 'DNT', 'Sec-GPC'],
 )
+app.add_middleware(WebSecurityMiddleware)
 app.include_router(visit_statistics_router)
+app.include_router(structure_router)
 
 
 class Step(BaseModel):
@@ -90,6 +104,16 @@ class DownloadPayload(BaseModel):
     format: str = "matrix"
 
 
+class DownloadSpectrum(BaseModel):
+    wavenumber: List[float]
+    intensity: List[float]
+    baseline: Optional[List[float]] = None
+
+
+class BatchDownloadPayload(BaseModel):
+    spectra: List[DownloadSpectrum] = Field(min_length=1, max_length=64)
+
+
 DEMO_SPECTRA = {
     "bacteria": "Bacteria.txt",
     "ulf": "ULF.txt",
@@ -104,9 +128,14 @@ DEMO_MAPPING = {
 }
 
 DATASETS: Dict[str, Dict[str, Any]] = {}
+BATCH_MAX_SPECTRA = 512
+BATCH_CHUNK_SIZE = 64
 DATASET_LOCK = RLock()
 DATASET_TTL_SECONDS = 1800
 DATASET_MAX_BYTES = 1024 * 1024 * 1024
+DATASET_OWNER_MAX_BYTES = 512 * 1024 * 1024
+DATASET_OWNER_MAX_COUNT = 64
+DATASET_MAX_COUNT = 256
 
 
 @app.exception_handler(ValueError)
@@ -125,7 +154,7 @@ def purge_datasets():
 def get_dataset(dataset_id):
     purge_datasets()
     with DATASET_LOCK:
-        if dataset_id not in DATASETS:
+        if dataset_id not in DATASETS or DATASETS[dataset_id].get('owner') != current_owner():
             raise HTTPException(status_code=404, detail='Dataset not found or expired. Please reload your file.')
         DATASETS[dataset_id]['last_access'] = time.monotonic()
         return DATASETS[dataset_id]
@@ -154,6 +183,9 @@ async def stop_cleanup():
 @app.delete('/api/datasets/{dataset_id}')
 def delete_dataset(dataset_id: str):
     with DATASET_LOCK:
+        dataset = DATASETS.get(dataset_id)
+        if current_owner() is not None and (dataset is None or dataset.get('owner') != current_owner()):
+            raise HTTPException(404, 'Dataset not found or expired. Please reload your file.')
         DATASETS.pop(dataset_id, None)
     return {'code': 0, 'msg': 'Dataset released'}
 
@@ -162,6 +194,8 @@ def clean_floats(values: Any) -> np.ndarray:
     arr = np.asarray(values, dtype=float)
     if arr.size == 0:
         raise ValueError("empty numeric array")
+    if current_owner() is not None and arr.size > MAX_NUMERIC_VALUES:
+        raise HTTPException(413, 'Numeric data exceeds the processing size limit')
     if not np.isfinite(arr).all():
         raise ValueError('Numeric data must be finite')
     return arr
@@ -198,6 +232,8 @@ def read_spectrum(content: bytes) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def validate_mapping(wavenumber: np.ndarray, data: np.ndarray) -> None:
+    if current_owner() is not None and data.size > MAX_NUMERIC_VALUES:
+        raise HTTPException(413, 'Mapping exceeds the processing size limit')
     if not wavenumber.size or not data.size or data.shape[-1] != len(wavenumber):
         raise ValueError("Spectral columns do not match the wavenumber axis.")
     if not np.isfinite(wavenumber).all() or not np.isfinite(data).all():
@@ -240,6 +276,8 @@ def read_time_series(content: bytes, instrument: str) -> Tuple[np.ndarray, np.nd
         df.columns = ["time", "wavenumber", "intensity"]
         if df.duplicated(["time", "wavenumber"]).any():
             raise ValueError("Duplicate time/wavenumber pairs in Renishaw file.")
+        if current_owner() is not None and df['time'].nunique() * df['wavenumber'].nunique() > MAX_NUMERIC_VALUES:
+            raise HTTPException(413, 'Time-series grid exceeds the processing size limit')
         pivot = df.pivot_table(index="time", columns="wavenumber", values="intensity", aggfunc="first")
         wave, data = pivot.columns.values.astype(float), pivot.values.astype(float)
         validate_mapping(wave, data)
@@ -434,7 +472,9 @@ def denoise_matrix(matrix: np.ndarray, params: Dict[str, Any], method: str) -> n
     return denoise_batch(matrix, params, method)
 
 
-def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], List[Dict[str, Any]]]:
+def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step], batch_size: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], List[Dict[str, Any]]]:
+    if current_owner() is not None and (data.size > MAX_NUMERIC_VALUES or len(steps) > 16):
+        raise HTTPException(413, 'Pipeline exceeds the processing size or step limit')
     if wavenumber.ndim != 1 or data.ndim not in (1, 2) or data.shape[-1] != len(wavenumber):
         raise ValueError('Spectral data must match the one-dimensional wavenumber axis')
     if not len(wavenumber) or not np.isfinite(wavenumber).all() or not np.isfinite(data).all():
@@ -448,8 +488,17 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
     if is_vector:
         current = current.reshape(1, -1)
 
+    # F2P always resamples to 1600 points, including spectra shortened by a cut.
+    f2p_steps = sum(step.type == 'denoise' and step.method == 'f2p' for step in steps)
+    if current_owner() is not None and len(current) * 1600 * f2p_steps > MAX_NUMERIC_VALUES:
+        raise HTTPException(413, 'F2P job exceeds the online inference size limit. Use fewer spectra or F2P steps.')
+
     for step in steps:
         params = step.params or {}
+        if current_owner() is not None and step.type == 'denoise' and step.method == 'tsvd':
+            rows, columns = current.shape
+            if rows * columns * min(rows, columns) > 10_000_000_000:
+                raise HTTPException(413, 'TSVD job is too large for online processing. Cut the spectral range or use local processing.')
         if step.type == "cut":
             start = float(params.get("start", current_wn.min()))
             end = float(params.get("end", current_wn.max()))
@@ -468,20 +517,22 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
             if method == 'tsvd' and is_vector:
                 raise ValueError('TSVD requires a batch or hyperspectral dataset, not a single spectrum')
             params = validated_parameters(method, params)
-            current = denoise_matrix(current, params, method)
+            if batch_size and method != 'tsvd':
+                current = np.vstack([denoise_matrix(current[offset:offset + batch_size], params, method)
+                                     for offset in range(0, len(current), batch_size)])
+            else:
+                current = denoise_matrix(current, params, method)
             history.append({"type": "denoise", "method": method, "params": params})
         elif step.type == "baseline":
             params = validated_parameters(step.method, params)
-            corrected = []
-            baselines = []
-            for row in current:
-                row_corrected, row_baseline = baseline_correct(row, params, step.method)
-                corrected.append(row_corrected)
-                if row_baseline is not None:
-                    baselines.append(row_baseline)
-            current = np.vstack(corrected)
-            if baselines:
-                removed = np.vstack(baselines)
+            if batch_size:
+                blocks = [correct_baseline_batch(current[offset:offset + batch_size], params, step.method)
+                          for offset in range(0, len(current), batch_size)]
+                current = np.vstack([block[0] for block in blocks])
+                removed = None if blocks[0][1] is None else np.vstack([block[1] for block in blocks])
+            else:
+                current, removed = correct_baseline_batch(current, params, step.method)
+            if removed is not None:
                 baseline = removed if baseline is None else baseline + removed
             history.append({"type": "baseline", "method": step.method, "params": params})
         else:
@@ -493,24 +544,29 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step]) 
 
 
 def register_dataset(wavenumber: np.ndarray, data: np.ndarray, mode: str, filename: str, coordinates: Optional[Dict[str, Any]] = None) -> str:
-    dataset_id = uuid.uuid4().hex
-    dataset = {
-        "wavenumber": np.asarray(wavenumber, dtype=float),
-        "data": np.asarray(data, dtype=float),
-        "mode": mode,
-        "filename": filename,
-        "coordinates": coordinates or {},
-        "last_access": time.monotonic(),
-    }
+    return register_datasets([(wavenumber, data, mode, filename, coordinates)])[0]
+
+
+def register_datasets(entries):
+    owner = current_owner()
+    datasets = [{
+        'wavenumber': np.asarray(wave, dtype=float), 'data': np.asarray(data, dtype=float),
+        'mode': mode, 'filename': filename, 'coordinates': coordinates or {},
+        'last_access': time.monotonic(), 'owner': owner,
+    } for wave, data, mode, filename, coordinates in entries]
+    size = lambda dataset: dataset['data'].nbytes + dataset['wavenumber'].nbytes
+    incoming = sum(size(dataset) for dataset in datasets)
     purge_datasets()
     with DATASET_LOCK:
-        if dataset['data'].nbytes > DATASET_MAX_BYTES:
-            raise ValueError('Dataset exceeds the in-memory size limit')
-        while DATASETS and sum(d['data'].nbytes for d in DATASETS.values()) + dataset['data'].nbytes > DATASET_MAX_BYTES:
-            oldest = min(DATASETS, key=lambda key: DATASETS[key]['last_access'])
-            del DATASETS[oldest]
-        DATASETS[dataset_id] = dataset
-    return dataset_id
+        own = [dataset for dataset in DATASETS.values() if dataset.get('owner') == owner]
+        if owner is not None and (sum(size(dataset) for dataset in own) + incoming > DATASET_OWNER_MAX_BYTES
+                                  or len(own) + len(datasets) > DATASET_OWNER_MAX_COUNT):
+            raise HTTPException(413, 'Workspace storage limit reached. Clear unused data or load a smaller file.')
+        if sum(size(dataset) for dataset in DATASETS.values()) + incoming > DATASET_MAX_BYTES or len(DATASETS) + len(datasets) > DATASET_MAX_COUNT:
+            raise HTTPException(503, 'Dataset storage is busy. Please retry shortly.')
+        identifiers = [uuid.uuid4().hex for _ in datasets]
+        DATASETS.update(zip(identifiers, datasets))
+    return identifiers
 
 
 def closest_wavenumber_index(wavenumber: np.ndarray, target: Optional[float] = None) -> int:
@@ -569,6 +625,7 @@ def health() -> Dict[str, Any]:
         "msg": "RamanCloud preprocessing API is running",
         "data": {
             "framework": "FastAPI",
+            "application_version": APPLICATION_VERSION,
             "denoise": list(DENOISE_METHODS),
             "baseline": list(BASELINE_METHODS),
             "algorithm_version": "2.1.0",
@@ -587,16 +644,29 @@ def demo_spectrum(name: str) -> Dict[str, Any]:
     return {"code": 0, "msg": "Demo loaded", "data": {"name": name, "wavenumber": wave.tolist(), "intensity": intensity.tolist()}}
 
 
+async def read_upload(file: UploadFile) -> bytes:
+    content = await file.read(MAX_BODY_BYTES + 1)
+    if len(content) > MAX_BODY_BYTES:
+        raise HTTPException(413, 'File exceeds the 200 MiB upload limit')
+    return content
+
+
 @app.post("/api/upload")
-async def upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
+async def upload(files: List[UploadFile] = File(...), share_data: bool = Form(True)) -> Dict[str, Any]:
+    if not 1 <= len(files) <= BATCH_MAX_SPECTRA:
+        raise HTTPException(status_code=400, detail=f'Upload accepts 1 to {BATCH_MAX_SPECTRA} spectrum files')
     spectra = []
+    originals = []
     for file in files:
         try:
-            wave, intensity = read_spectrum(await file.read())
+            content = await read_upload(file)
+            wave, intensity = await asyncio.to_thread(read_spectrum, content)
         except (ValueError, IndexError, pd.errors.ParserError) as exc:
             raise HTTPException(status_code=400, detail="{}: {}".format(file.filename, exc)) from exc
         spectra.append({"filename": file.filename, "wavenumber": wave.tolist(), "intensity": intensity.tolist(), "length": len(wave)})
-    return {"code": 0, "msg": "Upload successful", "data": {"spectra": spectra}}
+        originals.append((file.filename or 'spectrum.txt', content))
+    sharing = await asyncio.to_thread(archive_uploads, originals, 'web', 'spectrum', share_data=share_data)
+    return {"code": 0, "msg": "Upload successful", "data": {"spectra": spectra}, "data_sharing": sharing}
 
 
 @app.get("/api/demo-hyperspectral/{name}")
@@ -617,55 +687,75 @@ async def upload_mapping(
     file: UploadFile = File(...),
     instrument: str = Form("Horiba"),
     mode: str = Form("imaging"),
+    share_data: bool = Form(True),
 ) -> Dict[str, Any]:
-    content = await file.read()
+    content = await read_upload(file)
     try:
         if mode == "time_series":
-            wave, data, coordinates = read_time_series(content, instrument)
+            wave, data, coordinates = await asyncio.to_thread(read_time_series, content, instrument)
         elif mode == "imaging":
-            wave, data, coordinates = read_imaging(content, instrument)
+            wave, data, coordinates = await asyncio.to_thread(read_imaging, content, instrument)
         else:
             raise ValueError("Unsupported mapping mode.")
     except (ValueError, KeyError, IndexError, pd.errors.ParserError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"code": 0, "msg": "Mapping uploaded", "data": mapping_payload(wave, data, mode, file.filename or "mapping.txt", coordinates)}
+    sharing = await asyncio.to_thread(archive_uploads, [(file.filename or 'mapping.txt', content)], 'web', mode, instrument, share_data)
+    return {"code": 0, "msg": "Mapping uploaded", "data": mapping_payload(wave, data, mode, file.filename or "mapping.txt", coordinates), "data_sharing": sharing}
 
 
 @app.post("/api/tools/split")
-async def split_mapping_tool(file: UploadFile = File(...), instrument: str = Form("Horiba")) -> Response:
+async def split_mapping_tool(file: UploadFile = File(...), instrument: str = Form("Horiba"), share_data: bool = Form(True)) -> Response:
     try:
-        content = split_mapping_file(await file.read(), instrument, file.filename or "mapping.txt")
+        original = await read_upload(file)
+        content = await asyncio.to_thread(split_mapping_file, original, instrument, file.filename or "mapping.txt")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return attachment_response(content, "split_files.zip", "application/zip")
+    sharing = await asyncio.to_thread(archive_uploads, [(file.filename or 'mapping.txt', original)], 'web', 'split', instrument, share_data)
+    response = attachment_response(content, "split_files.zip", "application/zip")
+    response.headers['X-RamanCloud-Data-Sharing'] = sharing['status']
+    return response
 
 
 @app.post("/api/tools/merge")
-async def merge_files_tool(files: List[UploadFile] = File(...)) -> Response:
+async def merge_files_tool(files: List[UploadFile] = File(...), share_data: bool = Form(True)) -> Response:
+    if not 1 <= len(files) <= BATCH_MAX_SPECTRA:
+        raise HTTPException(400, 'Too many files to merge')
     try:
-        payload = [(file.filename or f"spectrum_{idx + 1}.txt", await file.read()) for idx, file in enumerate(files)]
-        content = merge_spectrum_files(payload)
+        payload = [(file.filename or f"spectrum_{idx + 1}.txt", await read_upload(file)) for idx, file in enumerate(files)]
+        content = await asyncio.to_thread(merge_spectrum_files, payload)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return attachment_response(content, "merged_mapping.txt")
+    sharing = await asyncio.to_thread(archive_uploads, payload, 'web', 'merge', share_data=share_data)
+    response = attachment_response(content, "merged_mapping.txt")
+    response.headers['X-RamanCloud-Data-Sharing'] = sharing['status']
+    return response
 
 
 @app.post("/api/tools/convert")
-async def convert_mapping_tool(file: UploadFile = File(...), conversion: str = Form("horiba_to_nanophoton")) -> Response:
+async def convert_mapping_tool(file: UploadFile = File(...), conversion: str = Form("horiba_to_nanophoton"), share_data: bool = Form(True)) -> Response:
     try:
-        content = await file.read()
+        content = await read_upload(file)
         stem = Path(file.filename or "mapping.txt").stem
         if conversion == "horiba_to_nanophoton":
-            converted = horiba_to_nanophoton(content)
+            converted = await asyncio.to_thread(horiba_to_nanophoton, content)
             filename = f"{stem}_to_Nanophoton.txt"
         elif conversion == "nanophoton_to_horiba":
-            converted = nanophoton_to_horiba(content)
+            converted = await asyncio.to_thread(nanophoton_to_horiba, content)
             filename = f"{stem}_to_Horiba.txt"
         else:
             raise ValueError("Unsupported conversion.")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return attachment_response(converted, filename)
+    sharing = await asyncio.to_thread(archive_uploads, [(file.filename or 'mapping.txt', content)], 'web', 'convert', conversion, share_data)
+    response = attachment_response(converted, filename)
+    response.headers['X-RamanCloud-Data-Sharing'] = sharing['status']
+    return response
 
 
 @app.post("/api/process")
@@ -677,6 +767,7 @@ def process_spectrum(payload: SpectrumPayload) -> Dict[str, Any]:
         "code": 0,
         "msg": "Pipeline completed",
         "data": {
+            "application_version": APPLICATION_VERSION,
             "wavenumber": out_wave.tolist(),
             "intensity": out_intensity.tolist(),
             "baseline": baseline.tolist() if baseline is not None else None,
@@ -687,26 +778,31 @@ def process_spectrum(payload: SpectrumPayload) -> Dict[str, Any]:
 
 @app.post('/api/process-batch')
 def process_batch(payload: BatchPayload):
-    if not 1 <= len(payload.spectra) <= 100:
-        raise ValueError('Batch processing accepts 1 to 100 spectra')
+    if current_owner() is not None and sum(len(item.intensity) for item in payload.spectra) > MAX_NUMERIC_VALUES:
+        raise HTTPException(413, 'Batch exceeds the processing size limit')
+    if not 1 <= len(payload.spectra) <= BATCH_MAX_SPECTRA:
+        raise ValueError(f'Batch processing accepts 1 to {BATCH_MAX_SPECTRA} spectra')
     results = []
-    if any(step.method == 'tsvd' and step.type == 'denoise' for step in payload.steps):
-        wave = clean_floats(payload.spectra[0].wavenumber)
-        if any(not np.array_equal(wave, clean_floats(item.wavenumber)) for item in payload.spectra):
-            raise ValueError('TSVD requires identical wavenumber axes across all spectra')
+    wave = clean_floats(payload.spectra[0].wavenumber)
+    aligned = all(np.array_equal(wave, clean_floats(item.wavenumber)) for item in payload.spectra)
+    joint = any(step.method == 'tsvd' and step.type == 'denoise' for step in payload.steps)
+    if joint and not aligned:
+        raise ValueError('TSVD requires identical wavenumber axes across all spectra')
+    if aligned:
         matrix = clean_floats([item.intensity for item in payload.spectra])
-        out_wave, out, baseline, history = apply_pipeline(wave, matrix, payload.steps)
+        out_wave, out, baseline, history = apply_pipeline(wave, matrix, payload.steps, batch_size=BATCH_CHUNK_SIZE)
         for index, item in enumerate(payload.spectra):
-            results.append({'filename': item.filename, 'wavenumber': out_wave.tolist(),
+            results.append({'application_version': APPLICATION_VERSION, 'filename': item.filename, 'wavenumber': out_wave.tolist(),
                             'intensity': out[index].tolist(), 'history': history,
                             'baseline': baseline[index].tolist() if baseline is not None else None})
         return {'code': 0, 'msg': 'Batch pipeline completed', 'data': {'spectra': results}}
-    for spectrum in payload.spectra:
-        try:
-            result = process_spectrum(SpectrumPayload(wavenumber=spectrum.wavenumber, intensity=spectrum.intensity, steps=payload.steps))['data']
-        except ValueError as error:
-            raise ValueError(spectrum.filename + ': ' + str(error))
-        results.append(dict(result, filename=spectrum.filename))
+    for offset in range(0, len(payload.spectra), BATCH_CHUNK_SIZE):
+        for spectrum in payload.spectra[offset:offset + BATCH_CHUNK_SIZE]:
+            try:
+                result = process_spectrum(SpectrumPayload(wavenumber=spectrum.wavenumber, intensity=spectrum.intensity, steps=payload.steps))['data']
+            except ValueError as error:
+                raise ValueError(spectrum.filename + ': ' + str(error))
+            results.append(dict(result, filename=spectrum.filename))
     return {'code': 0, 'msg': 'Batch pipeline completed', 'data': {'spectra': results}}
 
 
@@ -737,9 +833,14 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
         processed_cube = out_spectra.reshape(int(original_shape[0]), int(original_shape[1]), out_spectra.shape[-1])
     else:
         processed_cube = out_spectra
-    processed_id = register_dataset(out_wave, processed_cube, mode, "processed_" + filename, coordinates)
+    entries = [(out_wave, processed_cube, mode, 'processed_' + filename, coordinates)]
+    if baseline is not None:
+        entries.append((out_wave, baseline.reshape(processed_cube.shape), mode, 'baseline_' + filename, coordinates))
+    identifiers = register_datasets(entries)
+    processed_id = identifiers[0]
     preview, preview_wn, preview_idx, preview_scale = heatmap_slice(out_wave, processed_cube)
     response = {
+        "application_version": APPLICATION_VERSION,
         "processed_dataset_id": processed_id,
         "coordinates": coordinates,
         "wavenumber": out_wave.tolist(),
@@ -753,8 +854,7 @@ def process_cube(payload: CubePayload) -> Dict[str, Any]:
     }
     if baseline is not None:
         response["baseline_mean"] = rounded_list(baseline.mean(axis=0))
-        baseline_cube = baseline.reshape(processed_cube.shape)
-        response['baseline_dataset_id'] = register_dataset(out_wave, baseline_cube, mode, 'baseline_' + filename, coordinates)
+        response['baseline_dataset_id'] = identifiers[1]
     return {"code": 0, "msg": "Mapping pipeline completed", "data": response}
 
 
@@ -815,6 +915,28 @@ def get_hyperspectral_spectrum(dataset_id: str, index: int = 0) -> Dict[str, Any
     }
 
 
+def spectrum_download_text(wavenumber, intensity, baseline=None):
+    data = {"wavenumber": clean_floats(wavenumber), "intensity": clean_floats(intensity)}
+    if baseline is not None:
+        data["baseline"] = clean_floats(baseline)
+    return pd.DataFrame(data).to_csv(sep="\t", index=False, header=False, float_format="%.8g")
+
+
+@app.post("/api/download-batch")
+def download_batch(payload: BatchDownloadPayload):
+    count = sum(len(item.wavenumber) + len(item.intensity) + len(item.baseline or [])
+                for item in payload.spectra)
+    if count > MAX_NUMERIC_VALUES:
+        raise HTTPException(413, 'Batch download exceeds the numeric data size limit')
+    spectra = []
+    for item in payload.spectra:
+        spectra.append({
+            "content": spectrum_download_text(item.wavenumber, item.intensity),
+            "baseline": spectrum_download_text(item.wavenumber, item.baseline) if item.baseline is not None else None,
+        })
+    return {"code": 0, "data": {"spectra": spectra}}
+
+
 @app.post("/api/download")
 def download(payload: DownloadPayload) -> Response:
     filename = payload.filename or "processed.txt"
@@ -841,12 +963,7 @@ def download(payload: DownloadPayload) -> Response:
         matrix = np.vstack([wave, spectra]).T
         content = pd.DataFrame(matrix).to_csv(sep="\t", index=False, header=False, float_format="%.8g")
     else:
-        wave = clean_floats(payload.wavenumber)
-        intensity = clean_floats(payload.intensity)
-        data = {"wavenumber": wave, "intensity": intensity}
-        if payload.baseline is not None:
-            data["baseline"] = clean_floats(payload.baseline)
-        content = pd.DataFrame(data).to_csv(sep="\t", index=False, header=False, float_format="%.8g")
+        content = spectrum_download_text(payload.wavenumber, payload.intensity, payload.baseline)
     quoted = re.sub(r"[^A-Za-z0-9_.-]+", "_", filename)
     return Response(
         content=content,
@@ -862,7 +979,9 @@ if __name__ == "__main__":
     if not hasattr(asyncio, "current_task"):
         asyncio.current_task = asyncio.Task.current_task
 
-    config = uvicorn.Config("app:app", host="127.0.0.1", port=5000, reload=False)
+    config = uvicorn.Config("app:app", host="127.0.0.1", port=5000, reload=False,
+                            limit_concurrency=64, backlog=128, timeout_keep_alive=5,
+                            timeout_graceful_shutdown=60, forwarded_allow_ips='127.0.0.1')
     server = uvicorn.Server(config)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server.serve())

@@ -17,7 +17,7 @@ if __package__:
 else:
     from visit_geolocation import CountryLookup
 
-ROUTES = ("/", "/spectral", "/hyperspectral", "/extra-tools", "/tutorial", "/contributors")
+ROUTES = ("/", "/spectral", "/hyperspectral", "/spectrum-structure", "/extra-tools", "/tutorial", "/contributors", "/privacy-policy")
 DATA_DIR = Path(os.environ.get("RAMANCLOUD_ANALYTICS_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "ramancloud" / "analytics"))
 HISTORY_PATH = Path(__file__).with_name("historical_visits.json")
 router = APIRouter(prefix="/api/visits", tags=["Visit statistics"])
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class Pageview(BaseModel):
     event_id: UUID
     session_id: UUID
-    path: Literal["/", "/spectral", "/hyperspectral", "/extra-tools", "/tutorial", "/contributors"]
+    path: Literal["/", "/spectral", "/hyperspectral", "/spectrum-structure", "/extra-tools", "/tutorial", "/contributors", "/privacy-policy"]
 
 
 class VisitStore:
@@ -58,6 +58,9 @@ class VisitStore:
             connection.execute("BEGIN IMMEDIATE")
             if "country" not in {row["name"] for row in connection.execute("PRAGMA table_info(pageviews)")}:
                 connection.execute("ALTER TABLE pageviews ADD COLUMN country TEXT NOT NULL DEFAULT 'ZZ'")
+            if "country_reason" not in {row["name"] for row in connection.execute("PRAGMA table_info(pageviews)")}:
+                connection.execute("ALTER TABLE pageviews ADD COLUMN country_reason TEXT NOT NULL DEFAULT 'legacy_unknown'")
+                connection.execute("UPDATE pageviews SET country_reason='located' WHERE country!='ZZ'")
             connection.execute("INSERT OR IGNORE INTO metadata VALUES ('started_at', ?)", (datetime.now(timezone.utc).isoformat(),))
             if not connection.execute("SELECT 1 FROM metadata WHERE key='historical_baseline'").fetchone():
                 baseline = json.loads(HISTORY_PATH.read_text()) if os.environ.get("RAMANCLOUD_ANALYTICS_IMPORT_V1", "1") != "0" else {"pageviews": 0, "since": None, "countries": {}}
@@ -70,7 +73,7 @@ class VisitStore:
         os.chmod(self.path, 0o600)
         return connection
 
-    def record(self, event, now=None, country="ZZ"):
+    def record(self, event, now=None, country="ZZ", country_reason=None):
         now = now or datetime.now(timezone.utc)
         session_hash = hashlib.sha256(str(event.session_id).encode()).hexdigest()
         connection = self.connect()
@@ -85,8 +88,8 @@ class VisitStore:
                 ).fetchone()[0]
                 if count >= 240:
                     raise HTTPException(429, "Pageview rate limit exceeded")
-                connection.execute("INSERT INTO pageviews (event_id, session_hash, path, occurred_at, day, country) VALUES (?, ?, ?, ?, ?, ?)",
-                                   (str(event.event_id), session_hash, event.path, now.isoformat(), now.date().isoformat(), country))
+                connection.execute("INSERT INTO pageviews (event_id, session_hash, path, occurred_at, day, country, country_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                   (str(event.event_id), session_hash, event.path, now.isoformat(), now.date().isoformat(), country, country_reason or ('located' if country != 'ZZ' else 'unspecified')))
             return True
         finally:
             connection.close()
@@ -106,6 +109,7 @@ class VisitStore:
             pages = [dict(row) for row in connection.execute("SELECT path, COUNT(*) AS pageviews FROM pageviews WHERE day>=? GROUP BY path ORDER BY pageviews DESC, path", (first_day,))]
             baseline = json.loads(connection.execute("SELECT value FROM metadata WHERE key='historical_baseline'").fetchone()[0])
             current_countries = {row["country"]: row["count"] for row in connection.execute("SELECT country, COUNT(*) AS count FROM pageviews GROUP BY country")}
+            unknown_reasons = {row['country_reason']: row['count'] for row in connection.execute("SELECT country_reason,COUNT(*) AS count FROM pageviews WHERE country='ZZ' GROUP BY country_reason ORDER BY country_reason")}
             codes = set(baseline["countries"]) | set(current_countries)
             countries = [{"code": code, "historical": baseline["countries"].get(code, 0), "recorded": current_countries.get(code, 0),
                           "count": baseline["countries"].get(code, 0) + current_countries.get(code, 0)} for code in codes]
@@ -113,7 +117,7 @@ class VisitStore:
             return {"schema_version": 2, "timezone": "UTC", "started_at": connection.execute("SELECT value FROM metadata WHERE key='started_at'").fetchone()[0],
                     "total": {"pageviews": baseline["pageviews"] + totals["pageviews"], "sessions": totals["sessions"]},
                     "historical": baseline, "recorded": dict(totals), "countries": countries,
-                    "geolocation": {"enabled": CountryLookup(self.directory).enabled, "provider": "DB-IP"},
+                    "geolocation": {"enabled": CountryLookup(self.directory).enabled, "provider": "DB-IP", "unknown_reasons": unknown_reasons},
                     "today": daily[-1], "days": days, "daily": daily, "pages": pages}
         finally:
             connection.close()
@@ -146,7 +150,8 @@ def record_pageview(event: Pageview, request: Request):
     if request.headers.get("dnt") == "1" or request.headers.get("sec-gpc") == "1":
         return {"recorded": False}
     try:
-        return {"recorded": store.record(event, country=CountryLookup(store.directory).lookup(request))}
+        country, reason = CountryLookup(store.directory).resolve(request)
+        return {"recorded": store.record(event, country=country, country_reason=reason)}
     except (sqlite3.Error, OSError):
         logger.exception("Pageview persistence failed")
         raise HTTPException(503, "Visit statistics storage unavailable")

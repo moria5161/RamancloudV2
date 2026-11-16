@@ -12,7 +12,7 @@ export default function WorkspaceFeedback({ task, error, onDismiss }) {
           <div className="glass task-status">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span>{t(task.phase)}{task.progress != null ? ` ${task.progress}%` : ''}</span>
-            {task.progress != null && <progress value={task.progress} max="100" aria-label={t('uploadingData')} />}
+            {task.progress != null && <progress value={task.progress} max="100" aria-label={t(task.phase)} />}
           </div>
         </div>
       )}

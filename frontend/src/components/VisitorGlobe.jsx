@@ -20,6 +20,15 @@ export default function VisitorGlobe({ data, compact = false }) {
   const points = useMemo(() => data.countries.map(item => ({ code: item.code, count: item.count || 0 })).filter(item => item.count > 0).sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)), [data.countries]);
   const known = points.filter(point => point.code !== 'ZZ');
   const unknown = points.find(point => point.code === 'ZZ')?.count || 0;
+  const unknownLabels = zh ? {
+    legacy_unknown: '旧记录未保存定位原因', unspecified: '未记录定位原因', non_public_address: '私网或保留地址',
+    invalid_address: '地址缺失或无效', database_unavailable: '地理库不可用', not_found: '地理库无匹配', lookup_error: '地理库读取失败',
+  } : {
+    legacy_unknown: 'Earlier records without a lookup reason', unspecified: 'Unspecified', non_public_address: 'Non-public address',
+    invalid_address: 'Missing or invalid address', database_unavailable: 'Database unavailable', not_found: 'No country match', lookup_error: 'Database read failed',
+  };
+  const unknownHint = [zh ? '未知地区仍计入总访问量，但不放置地图标记。' : 'Unknown regions count toward total visits but have no map marker.',
+    ...Object.entries(data.geolocation?.unknown_reasons || {}).map(([reason, count]) => `${unknownLabels[reason] || reason}: ${number(count)}`)].join('\n');
   const active = hovered || points.find(point => point.code === selected);
   const onFailure = useCallback(() => setFailed(true), []);
   const select = useCallback(code => { setSelected(code); setPlaying(false); api.current?.focus(code); }, []);
@@ -66,7 +75,7 @@ export default function VisitorGlobe({ data, compact = false }) {
           </button>)}
           {!known.length && <p className="text-sm text-gray-500 py-4">{zh ? '暂时没有可定位的访问。' : 'No visits with a known region yet.'}</p>}
         </div>
-        {!!unknown && <p className="text-xs text-gray-500 pt-3">{zh ? '未知地区' : 'Unknown region'} · {number(unknown)}</p>}
+        {!!unknown && <p title={unknownHint} className="text-xs text-gray-500 pt-3">{zh ? '未知地区' : 'Unknown region'} · {number(unknown)}</p>}
       </div>
     </div>
     {!compact && <>

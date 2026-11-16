@@ -21,7 +21,9 @@ function stepSummary(step, t, language) {
   if (step.method === 'sg') return `SG · ${t('window')} ${step.params.window_size} · ${t('order')} ${step.params.order}`;
   if (step.method === 'wtd') return `WTD · ${step.params.wavelet || 'db3'} · ${t('level')} ${step.params.level || 3}`;
   if (step.method === 'skip') return t('skip');
-  const fields = algorithms.find(item => item.id === step.method)?.fields || [];
+  const algorithm = algorithms.find(item => item.id === step.method);
+  const fields = algorithm?.fields || [];
+  if (!fields.length) return algorithm?.name || step.method;
   return `${step.method} · ${Object.entries(step.params).map(([key, value]) => {
     const field = fields.find(item => item.key === key);
     return `${field ? (language === 'zh' ? field.zh : field.label) : key} ${typeof value === 'number' && value >= 10000 ? value.toExponential(0) : value}`;
@@ -35,7 +37,7 @@ const STEP_TYPES = {
 };
 
 
-export default function StepController({ steps, onChange, defaultCutRange, allowBatch = false }) {
+export default function StepController({ steps, onChange, defaultCutRange, allowBatch = false, issues = {} }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const { t, language } = usePreferences();
   const sensors = useSensors(
@@ -97,7 +99,7 @@ export default function StepController({ steps, onChange, defaultCutRange, allow
             <div className={`glass rounded-lg overflow-hidden border ${isExpanded ? 'border-indigo-500/30' : 'border-white/5'} transition-all duration-200`}>
               {/* Step header */}
               <div
-                className="flex items-center gap-2 p-3 cursor-pointer hover:bg-white/5"
+                className="step-header flex items-center gap-2 p-3 cursor-pointer hover:bg-white/5"
                 onClick={() => setExpandedStep(isExpanded ? null : step.id)}
                 role="button" tabIndex={0} aria-expanded={isExpanded}
                 onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setExpandedStep(isExpanded ? null : step.id); } }}
@@ -145,6 +147,8 @@ export default function StepController({ steps, onChange, defaultCutRange, allow
                       <div className="flex gap-2">
                         <input
                           type="number"
+                          aria-label={t('start')}
+                          aria-invalid={!!issues[step.id]}
                           value={step.params.start}
                           onChange={e => updateStep(step.id, { params: { ...step.params, start: e.target.value === '' ? '' : Number(e.target.value) } })}
                           className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
@@ -153,6 +157,8 @@ export default function StepController({ steps, onChange, defaultCutRange, allow
                         <span className="text-gray-500 self-center">–</span>
                         <input
                           type="number"
+                          aria-label={t('end')}
+                          aria-invalid={!!issues[step.id]}
                           value={step.params.end}
                           onChange={e => updateStep(step.id, { params: { ...step.params, end: e.target.value === '' ? '' : Number(e.target.value) } })}
                           className="w-full px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
@@ -165,6 +171,7 @@ export default function StepController({ steps, onChange, defaultCutRange, allow
                   {step.type !== 'cut' && <AlgorithmParameters step={step} allowBatch={allowBatch} update={updates => updateStep(step.id, updates)} />}
                 </div>
               )}
+              {issues[step.id] && <p role="status" className="px-3 pb-3 text-xs text-red-400 leading-relaxed">{issues[step.id]}</p>}
             </div>
             )}</SortableStep>
           );

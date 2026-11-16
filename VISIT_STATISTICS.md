@@ -42,7 +42,7 @@ Original screenshots are kept locally in the analytics `legacy/` archive, not pu
 ## 3D Globe
 
 The homepage globe uses Three.js and locally served Natural Earth map geometry.
-Its New V2 and May 2026 archive views are separate. Only country/region aggregates
+Historical and new country counts are combined in one view. Only country/region aggregates
 are mapped, at Natural Earth representative label positions. They are not city
 coordinates or precise IP locations. Unknown regions are listed but never plotted
 at invented coordinates. Raw IP addresses are not stored or exposed.
@@ -66,6 +66,11 @@ has approximate coverage; it is not an exact location or identity service.
 Lookup happens locally using the request's IP; only the resulting country code is
 stored. Raw IPs are never sent to a geolocation API. Private addresses, missing
 databases and unsuccessful lookups become `ZZ` (Unknown) without dropping visits.
+Each new event also stores a reason code: `non_public_address`, `invalid_address`,
+`database_unavailable`, `not_found`, or `lookup_error`. The summary exposes only
+aggregated reason counts in `geolocation.unknown_reasons`; no IP is stored.
+Older unknown events retain `legacy_unknown` because their original IPs and failure
+reasons were not saved. These cannot be reconstructed or assigned a country safely.
 Make sure your reverse proxy supplies the actual client address. Forwarded headers
 are accepted only from configured trusted proxies; set
 `RAMANCLOUD_ANALYTICS_TRUSTED_PROXIES` to comma-separated known proxy IP/CIDRs

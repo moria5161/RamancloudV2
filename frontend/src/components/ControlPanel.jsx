@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useId } from 'react';
 import StepController from './StepController';
-import { Play, Download, RotateCcw, Loader2, Zap, Trash2 } from 'lucide-react';
+import UploadedSpectrumPicker from './UploadedSpectrumPicker';
+import { Play, Download, RotateCcw, Loader2, Zap, Trash2, X } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import { pipelineIssues } from '../utils/pipelineValidation';
 
 export default function ControlPanel({
   steps,
@@ -23,9 +25,11 @@ export default function ControlPanel({
   includeRecord,
   onIncludeRecordChange,
   onClear,
+  onFileRemove,
   uploadedSpectra = [],
   selectedSpectrum = 0,
   onSpectrumChange,
+  onSpectrumRemove,
   processAll = false,
   onProcessAllChange,
   allowBatch = false,
@@ -34,9 +38,13 @@ export default function ControlPanel({
   hasBatchResult = false,
   onBatchDownload,
   batchStale = false,
+  wavenumber,
 }) {
   const { t, language } = usePreferences();
   const isZh = language === 'zh';
+  const sourceId = useId();
+  const spectrumId = useId();
+  const issues = pipelineIssues(steps, wavenumber, language);
 
   return (
     <div className="h-full flex flex-col glass border-l border-white/5">
@@ -49,8 +57,9 @@ export default function ControlPanel({
 
         {/* Data source */}
         <div className="space-y-2">
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('dataSource')}</label>
+          <label htmlFor={sourceId} className="text-xs text-gray-500 uppercase tracking-wider">{t('dataSource')}</label>
           <select
+            id={sourceId}
             disabled={busy}
             value={demoName || ''}
             onChange={e => onDemoChange(e.target.value)}
@@ -62,16 +71,21 @@ export default function ControlPanel({
             ))}
           </select>
           {fileName && (
-            <p className="text-[10px] text-gray-500 truncate">{t('file')}: {fileName}</p>
+            <div className="flex items-center gap-2">
+              <p className="min-w-0 flex-1 text-[10px] text-gray-500 truncate" title={fileName}>{t('file')}: {fileName}</p>
+              {onFileRemove && <button type="button" onClick={onFileRemove} disabled={busy || !hasData}
+                title={`${t('removeFile')}: ${fileName}`} aria-label={`${t('removeFile')}: ${fileName}`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                <X className="w-3.5 h-3.5" />
+              </button>}
+            </div>
           )}
-          {uploadedSpectra.length > 1 && (
+          {uploadedSpectra.length > 0 && (
             <div>
-              <label htmlFor="uploaded-spectrum" className="text-[10px] text-gray-500">{t('uploadedSpectrum')}</label>
-              <select id="uploaded-spectrum" disabled={busy} value={selectedSpectrum}
-                onChange={e => onSpectrumChange(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-xs bg-black/30 border border-white/10 rounded-lg text-gray-200">
-                {uploadedSpectra.map((spectrum, index) => <option key={index} value={index}>{spectrum.filename}</option>)}
-              </select>
+              <label htmlFor={spectrumId} className="text-xs text-gray-500">{t('uploadedSpectrum')}</label>
+              <UploadedSpectrumPicker id={spectrumId} spectra={uploadedSpectra}
+                selected={selectedSpectrum} onChange={onSpectrumChange}
+                onRemove={onSpectrumRemove} busy={busy} />
             </div>
           )}
           {uploadedSpectra.length > 1 && <label className="flex items-center gap-2 text-xs text-gray-500">
@@ -84,7 +98,7 @@ export default function ControlPanel({
 
       {/* Pipeline steps */}
       <fieldset disabled={busy} className="flex-1 overflow-y-auto p-4 min-h-0">
-        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} allowBatch={allowBatch || processAll} />
+        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} allowBatch={allowBatch || processAll} issues={issues} />
       </fieldset>
 
       {/* Action buttons */}
@@ -102,7 +116,7 @@ export default function ControlPanel({
         </button>}
         <button
           onClick={onProcess}
-          disabled={busy || !hasData || steps.length === 0}
+          disabled={busy || !hasData || steps.length === 0 || Object.keys(issues).length > 0}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
         >
           {isProcessing ? (

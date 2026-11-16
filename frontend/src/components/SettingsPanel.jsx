@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Languages, Moon, Settings, Sun } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import UploadSharingNotice from './UploadSharingNotice';
 
 export default function SettingsPanel() {
   const [open, setOpen] = useState(false);
@@ -69,6 +70,9 @@ export default function SettingsPanel() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="border-t border-white/10 pt-3">
+              <UploadSharingNotice onOpenPolicy={() => setOpen(false)} />
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { Crosshair } from 'lucide-react';
 import { sharedHeatmapBounds, selectionShapes, imagingDisplay, imagingPixel } from './chartHelpers';
 import useChartLayout from '../hooks/useChartLayout';
 import { usePreferences } from '../i18n';
+import ChartViewport from './ChartViewport';
 
 const darkLayout = {
   paper_bgcolor: 'rgba(0,0,0,0)',
@@ -14,14 +15,14 @@ const darkLayout = {
 };
 
 const equalPixelXAxis = {
-  title: 'Pixel X',
+  title: { text: 'Pixel X' },
   gridcolor: 'rgba(0,0,0,0.06)',
   zeroline: false,
   constrain: 'domain',
 };
 
 const equalPixelYAxis = {
-  title: 'Pixel Y',
+  title: { text: 'Pixel Y' },
   gridcolor: 'rgba(0,0,0,0.06)',
   zeroline: false,
   autorange: 'reversed',
@@ -65,7 +66,7 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
     ...imagingDisplay(heatmapZ, coordinates, previewScale, transpose),
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
-    colorbar: { title: t('intensity'), titleside: 'right', thickness: 12, len: 0.6 },
+    colorbar: { title: { text: t('intensity'), side: 'right' }, thickness: 12, len: 0.6 },
     hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('intensity')}: %{z:.2f}<extra></extra>`,
   }];
 
@@ -73,13 +74,14 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
   const sliderValue = Math.min(wnRange[1], Math.max(wnRange[0], selectedWN ?? wnRange[0]));
 
   return (
-    <div className="space-y-2">
+    <div className="h-full min-h-0 flex flex-col gap-2">
       {/* Wavenumber selector */}
-      <div className="flex items-center gap-3 px-1">
+      <div className="flex items-center gap-3 px-1 shrink-0">
         <Crosshair className="w-3.5 h-3.5 text-purple-400" />
         <label className="text-xs text-gray-400">{t('wavenumberAxis')}:</label>
         <input
           type="range"
+          aria-label={t('wavenumberAxis')}
           min={wnRange[0]}
           max={wnRange[1]}
           step="any"
@@ -87,26 +89,26 @@ export function ImagingHeatmap({ previewData, wavenumber, selectedWN, onSelectWN
           onChange={e => onSelectWN(parseFloat(e.target.value))}
           className="flex-1 accent-purple-500"
         />
-        <span className="text-xs text-purple-400 font-mono w-16 text-right">
-          {selectedWN?.toFixed(0) || '--'}
-        </span>
+        <input aria-label={t('selectedWavenumber')} type="number" min={wnRange[0]} max={wnRange[1]} step="any"
+          value={Number(sliderValue.toFixed(2))} onChange={event => { if (event.target.value !== '') onSelectWN(Math.max(wnRange[0], Math.min(wnRange[1], Number(event.target.value)))); }}
+          className="w-20 min-w-0 text-xs text-purple-400 font-mono text-right bg-transparent" />
       </div>
 
-      <Plot
+      <div className="flex-1 min-h-0"><ChartViewport>{chartHeight => <Plot
         data={traces}
         layout={{
           ...layout,
-          height: height || 500,
-          title: title || t('imaging'),
+          height: chartHeight,
+          title: { text: title || t('imaging') },
           shapes: selectionShapes({ pixel: imagingPixel(selectedPixel, transpose) }),
-          xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX') },
-          yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY') },
+          xaxis: { ...equalPixelXAxis, title: { text: t(transpose ? 'pixelY' : 'pixelX') } },
+          yaxis: { ...equalPixelYAxis, title: { text: t(transpose ? 'pixelX' : 'pixelY') } },
         }}
         config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
         onClick={onHeatmapClick}
         style={{ width: '100%' }}
         useResizeHandler={true}
-      />
+      />}</ChartViewport></div>
     </div>
   );
 }
@@ -133,7 +135,7 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
     z: data2D || [[]],
     type: 'heatmap',
     colorscale: colorscale || 'Jet',
-    colorbar: { title: t(difference ? 'intensityDifference' : 'intensity'), titleside: 'right', thickness: 12, len: 0.6 },
+    colorbar: { title: { text: t(difference ? 'intensityDifference' : 'intensity'), side: 'right' }, thickness: 12, len: 0.6 },
     x: wavenumber,
     y: timeCoordinates || indexAxis,
     hovertemplate: `${timeTitle}: %{y}<br>%{x:.1f} cm⁻¹<br>${t(difference ? 'intensityDifference' : 'intensity')}: %{z:.2f}<extra></extra>`,
@@ -145,10 +147,10 @@ export function TimeSeriesHeatmap({ data2D, wavenumber, title, height, colorscal
       layout={{
         ...layout,
         height: height || 500,
-        title: title || t('timeSeries'),
+        title: { text: title || t('timeSeries') },
         shapes: selectionShapes({ index: timeCoordinates?.[selectedIndex] ?? selectedIndex }),
-        xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
-        yaxis: { title: timeTitle, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
+        xaxis: { title: { text: t('wavenumberAxis') }, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
+        yaxis: { title: { text: timeTitle }, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
       onClick={onHeatmapClick}
@@ -194,7 +196,7 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
       z: rawData2D || [[]],
       type: 'heatmap',
       colorscale: colorscale || 'Jet',
-      colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: hasProcessed ? 0.4 : 0.6, y: hasProcessed ? 0.79 : 0.5 },
+      colorbar: { title: { text: t('raw'), side: 'right' }, thickness: 10, len: hasProcessed ? 0.4 : 0.6, y: hasProcessed ? 0.79 : 0.5 },
       x: rawWavenumber,
       y: timeCoordinates || rawIndexAxis,
       name: t('raw'),
@@ -210,7 +212,7 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
       z: processedData2D,
       type: 'heatmap',
       colorscale: colorscale || 'Jet',
-      colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
+      colorbar: { title: { text: t('processed'), side: 'right' }, thickness: 10, len: 0.4, y: 0.21 },
       x: processedWavenumber || rawWavenumber,
       y: timeCoordinates || processedIndexAxis,
       name: t('processed'),
@@ -227,17 +229,17 @@ export function CompareTimeSeriesHeatmap({ rawData2D, processedData2D, rawWavenu
         ...layout,
         height: height || 600,
         margin: { l: 55, r: 95, t: 40, b: 55 },
-        title: title || (hasProcessed ? t('rawProcessedComparison') : t('timeSeries')),
+        title: { text: title || (hasProcessed ? t('rawProcessedComparison') : t('timeSeries')) },
         shapes: selectionShapes({ index: timeCoordinates?.[selectedIndex] ?? selectedIndex, compare: hasProcessed }),
         ...(hasProcessed ? {
           grid: { rows: 2, columns: 1, subplots: [['xy'], ['x2y2']], roworder: 'top to bottom' },
-          xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y' },
-          yaxis: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.58, 1], anchor: 'x' },
-          xaxis2: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y2', matches: 'x' },
-          yaxis2: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 0.42], anchor: 'x2', matches: 'y' },
+          xaxis: { title: { text: t('wavenumberAxis') }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y' },
+          yaxis: { title: { text: timeTitle }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0.58, 1], anchor: 'x' },
+          xaxis2: { title: { text: t('wavenumberAxis') }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 1], anchor: 'y2', matches: 'x' },
+          yaxis2: { title: { text: timeTitle }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, domain: [0, 0.42], anchor: 'x2', matches: 'y' },
         } : {
-          xaxis: { title: t('wavenumberAxis'), gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
-          yaxis: { title: timeTitle, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
+          xaxis: { title: { text: t('wavenumberAxis') }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
+          yaxis: { title: { text: timeTitle }, gridcolor: 'rgba(0,0,0,0.06)', zeroline: false },
         }),
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
@@ -301,9 +303,9 @@ export function PixelSpectrum({ previewData, wavenumber, pixelX, pixelY, rawSpec
       layout={{
         ...layout,
         height: height || 300,
-        title: title || `${t('singlePixel')} (${pixelX}, ${pixelY})`,
-        xaxis: { ...layout.xaxis, title: t('wavenumberAxis'), gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
-        yaxis: { ...layout.yaxis, title: t('intensity'), gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
+        title: { text: title || `${t('singlePixel')} (${pixelX}, ${pixelY})` },
+        xaxis: { ...layout.xaxis, title: { text: t('wavenumberAxis') }, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
+        yaxis: { ...layout.yaxis, title: { text: t('intensity') }, gridcolor: 'rgba(255,255,255,0.03)', zeroline: false },
       }}
       config={{ displayModeBar: false, displaylogo: false, responsive: true }}
       style={{ width: '100%' }}
@@ -351,7 +353,7 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
     {
       ...rawBounds,
       ...imagingDisplay(rawZ, coordinates, previewScale, transpose), type: 'heatmap', colorscale: 'Jet',
-      colorbar: { title: t('raw'), titleside: 'right', thickness: 10, len: 0.4, y: 0.79 },
+      colorbar: { title: { text: t('raw'), side: 'right' }, thickness: 10, len: 0.4, y: 0.79 },
       name: t('raw'), xaxis: 'x', yaxis: 'y',
       hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('raw')}: %{z:.2f}<extra></extra>`,
     },
@@ -361,7 +363,7 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
     traces.push({
       ...processedBounds,
       ...imagingDisplay(procZ, coordinates, previewScale, transpose), type: 'heatmap', colorscale: 'Jet',
-      colorbar: { title: t('processed'), titleside: 'right', thickness: 10, len: 0.4, y: 0.21 },
+      colorbar: { title: { text: t('processed'), side: 'right' }, thickness: 10, len: 0.4, y: 0.21 },
       name: t('processed'), xaxis: 'x2', yaxis: 'y2',
       hovertemplate: `${t('sourceCoordinates')}: (%{customdata[0]}, %{customdata[1]})<br>${t('processed')}: %{z:.2f}<extra></extra>`,
     });
@@ -371,39 +373,41 @@ export function CompareImaging({ rawPreview, processedPreview, wavenumber, selec
   const sliderValue = Math.min(wnRange[1], Math.max(wnRange[0], selectedWN ?? wnRange[0]));
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3 px-1">
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <div className="flex items-center gap-3 px-1 shrink-0">
         <Crosshair className="w-3.5 h-3.5 text-purple-400" />
         <label className="text-xs text-gray-400">{t('wavenumberAxis')}:</label>
-        <input type="range" min={wnRange[0]} max={wnRange[1]} step="any"
+        <input aria-label={t('wavenumberAxis')} type="range" min={wnRange[0]} max={wnRange[1]} step="any"
           value={sliderValue} onChange={e => onSelectWN(parseFloat(e.target.value))}
           className="flex-1 accent-purple-500" />
-        <span className="text-xs text-purple-400 font-mono w-16 text-right">{selectedWN?.toFixed(0) || '--'}</span>
+        <input aria-label={t('selectedWavenumber')} type="number" min={wnRange[0]} max={wnRange[1]} step="any"
+          value={Number(sliderValue.toFixed(2))} onChange={event => { if (event.target.value !== '') onSelectWN(Math.max(wnRange[0], Math.min(wnRange[1], Number(event.target.value)))); }}
+          className="w-20 min-w-0 text-xs text-purple-400 font-mono text-right bg-transparent" />
       </div>
-      <Plot
+      <div className="flex-1 min-h-0"><ChartViewport>{chartHeight => <Plot
         data={traces}
         layout={{
           grid: procZ ? { rows: 2, columns: 1, subplots: [['xy'], ['x2y2']], roworder: 'top to bottom' } : undefined,
           ...layout,
-          height: height || 600,
+          height: chartHeight,
         margin: { l: 55, r: 95, t: 40, b: 55 },
-          title: procZ ? t('rawProcessedComparison') : t('imaging'),
+          title: { text: procZ ? t('rawProcessedComparison') : t('imaging') },
           shapes: selectionShapes({ pixel: imagingPixel(selectedPixel, transpose), compare: !!procZ }),
           ...(procZ ? {
-            xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX'), domain: [0, 1], anchor: 'y' },
-            yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY'), domain: [0.58, 1], anchor: 'x' },
-            xaxis2: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX'), domain: [0, 1], anchor: 'y2', matches: 'x' },
-            yaxis2: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY'), scaleanchor: 'x2', domain: [0, 0.42], anchor: 'x2', matches: 'y' },
+            xaxis: { ...equalPixelXAxis, title: { text: t(transpose ? 'pixelY' : 'pixelX') }, domain: [0, 1], anchor: 'y' },
+            yaxis: { ...equalPixelYAxis, title: { text: t(transpose ? 'pixelX' : 'pixelY') }, domain: [0.58, 1], anchor: 'x' },
+            xaxis2: { ...equalPixelXAxis, title: { text: t(transpose ? 'pixelY' : 'pixelX') }, domain: [0, 1], anchor: 'y2', matches: 'x' },
+            yaxis2: { ...equalPixelYAxis, title: { text: t(transpose ? 'pixelX' : 'pixelY') }, scaleanchor: 'x2', domain: [0, 0.42], anchor: 'x2', matches: 'y' },
           } : {
-            xaxis: { ...equalPixelXAxis, title: t(transpose ? 'pixelY' : 'pixelX') },
-            yaxis: { ...equalPixelYAxis, title: t(transpose ? 'pixelX' : 'pixelY') },
+            xaxis: { ...equalPixelXAxis, title: { text: t(transpose ? 'pixelY' : 'pixelX') } },
+            yaxis: { ...equalPixelYAxis, title: { text: t(transpose ? 'pixelX' : 'pixelY') } },
           }),
         }}
         config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
         onClick={onHeatmapClick}
         style={{ width: '100%' }}
         useResizeHandler={true}
-      />
+      />}</ChartViewport></div>
     </div>
   );
 }

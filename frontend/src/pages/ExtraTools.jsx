@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
-import { Archive, ArrowRightLeft, Combine, Download, FileArchive, Scissors, Upload } from 'lucide-react';
+import { Archive, ArrowRightLeft, Combine, Download, Scissors, Upload, Wrench } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import UploadSharingNotice from '../components/UploadSharingNotice';
+import { requestErrorDetail } from '../utils/requestError';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+import { API_BASE } from '../utils/apiBase';
 
 const tools = [
   { id: 'split', labelKey: 'splitMapping', descKey: 'splitMappingDesc', icon: Scissors },
@@ -20,11 +22,6 @@ function saveBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function errorMessage(error) {
-  const detail = error?.response?.data?.detail;
-  return detail || 'Tool execution failed. Please check the file format.';
-}
-
 export default function ExtraTools() {
   const { t } = usePreferences();
   const [mode, setMode] = useState('split');
@@ -33,6 +30,7 @@ export default function ExtraTools() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState('');
+  const [failed, setFailed] = useState(false);
   const inputRef = useRef(null);
 
   const multiple = mode === 'merge';
@@ -44,6 +42,7 @@ export default function ExtraTools() {
   };
 
   const handleMode = (nextMode) => {
+    if (isRunning) return;
     setMode(nextMode);
     setMessage('');
     resetFiles();
@@ -55,34 +54,38 @@ export default function ExtraTools() {
       return;
     }
     setIsRunning(true);
+    setFailed(false);
     setMessage('');
     try {
       const formData = new FormData();
+      formData.append('share_data', 'true');
       let endpoint = '';
       let filename = '';
 
       if (mode === 'split') {
         formData.append('file', selectedFiles[0]);
         formData.append('instrument', instrument);
-        endpoint = `${API_BASE}/api/tools/split`;
+        endpoint = `${API_BASE}/tools/split`;
         filename = 'split_files.zip';
       } else if (mode === 'merge') {
         selectedFiles.forEach((file) => formData.append('files', file));
-        endpoint = `${API_BASE}/api/tools/merge`;
+        endpoint = `${API_BASE}/tools/merge`;
         filename = 'merged_mapping.txt';
       } else {
         formData.append('file', selectedFiles[0]);
         formData.append('conversion', conversion);
-        endpoint = `${API_BASE}/api/tools/convert`;
+        endpoint = `${API_BASE}/tools/convert`;
         const stem = selectedFiles[0].name.replace(/\.[^.]+$/, '');
         filename = conversion === 'horiba_to_nanophoton' ? `${stem}_to_Nanophoton.txt` : `${stem}_to_Horiba.txt`;
       }
 
-      const { data } = await axios.post(endpoint, formData, { responseType: 'blob' });
+      const { data, headers } = await axios.post(endpoint, formData, { responseType: 'blob', timeout: 600000 });
       saveBlob(data, filename);
-      setMessage(t('toolDone'));
+      setMessage(headers['x-ramancloud-data-sharing'] === 'failed' ? `${t('toolDone')} ${t('archiveFailed')}` : t('toolDone'));
     } catch (error) {
-      setMessage(errorMessage(error));
+      const detail = await requestErrorDetail(error);
+      setFailed(true);
+      setMessage(`${t('requestFailed')}${detail ? ` ${detail}` : ''}`);
     } finally {
       setIsRunning(false);
     }
@@ -90,10 +93,10 @@ export default function ExtraTools() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-8 py-10 space-y-8 animate-fade-in">
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 space-y-8 animate-fade-in">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <FileArchive className="w-6 h-6 text-indigo-400" />
+            <Wrench className="w-6 h-6 shrink-0 text-indigo-400" />
             <h1 className="text-2xl font-bold text-white">{t('extraTools')}</h1>
           </div>
           <p className="text-sm text-gray-400 max-w-2xl">
@@ -101,10 +104,11 @@ export default function ExtraTools() {
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {tools.map(({ id, labelKey, descKey, icon: Icon }) => (
             <button
               key={id}
+              disabled={isRunning}
               onClick={() => handleMode(id)}
               className={`liquid-card glass rounded-xl p-5 border text-left transition-all ${
                 mode === id ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 bg-white/5'
@@ -142,11 +146,12 @@ export default function ExtraTools() {
             <Archive className="w-5 h-5 text-indigo-400" />
           </div>
 
+          <UploadSharingNotice />
           <div className="flex flex-wrap items-center gap-4">
             {mode === 'split' && (
               <label className="space-y-1.5">
                 <span className="text-xs text-gray-500">{t('instrument')}</span>
-                <select value={instrument} onChange={(e) => setInstrument(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
+                <select disabled={isRunning} value={instrument} onChange={(e) => setInstrument(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
                   <option value="Horiba">Horiba</option>
                   <option value="Renishaw">Renishaw</option>
                   <option value="Nanophoton">Nanophoton</option>
@@ -157,14 +162,15 @@ export default function ExtraTools() {
             {mode === 'convert' && (
               <label className="space-y-1.5">
                 <span className="text-xs text-gray-500">{t('conversion')}</span>
-                <select value={conversion} onChange={(e) => setConversion(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
-                  <option value="horiba_to_nanophoton">Horiba to Nanophoton</option>
-                  <option value="nanophoton_to_horiba">Nanophoton to Horiba</option>
+                <select disabled={isRunning} value={conversion} onChange={(e) => setConversion(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
+                  <option value="horiba_to_nanophoton">{t('horibaToNanophoton')}</option>
+                  <option value="nanophoton_to_horiba">{t('nanophotonToHoriba')}</option>
                 </select>
               </label>
             )}
 
             <button
+              disabled={isRunning}
               onClick={() => inputRef.current?.click()}
               className="liquid-button flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-gray-300 text-sm font-medium border border-white/5"
             >
@@ -175,6 +181,7 @@ export default function ExtraTools() {
             <input
               ref={inputRef}
               type="file"
+              disabled={isRunning}
               accept={accept}
               multiple={multiple}
               onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
@@ -200,15 +207,16 @@ export default function ExtraTools() {
           </div>
 
           {message && (
-            <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-4 py-3 text-sm text-gray-400">
+            <div role={failed ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${failed ? 'border-red-500/20 text-red-400' : 'border-indigo-500/20 text-gray-400'}`}>
               {message}
+              {failed && <button disabled={isRunning} onClick={runTool} className="ml-3 text-indigo-400 underline">{t('retry')}</button>}
             </div>
           )}
 
           <div className="flex items-center justify-end">
             <button
               onClick={runTool}
-              disabled={isRunning}
+              disabled={isRunning || !selectedFiles.length}
               className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isRunning ? t('running') : t('runTool')}

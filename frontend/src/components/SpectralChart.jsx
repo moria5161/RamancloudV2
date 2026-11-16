@@ -54,8 +54,8 @@ export default function SpectralChart({
       type: 'scatter',
       mode: 'lines',
       name: t('raw'),
-      line: { color: 'rgba(148,163,184,0.5)', width: 1.5 },
-      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Raw</extra>',
+      line: { color: '#8b95a5', width: 1.5 },
+      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('raw')}</extra>`,
     });
   }
 
@@ -67,7 +67,7 @@ export default function SpectralChart({
       mode: 'lines',
       name: t('processed'),
       line: { color: '#0071e3', width: 2.2 },
-      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Processed</extra>',
+      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('processed')}</extra>`,
     });
   }
 
@@ -79,7 +79,7 @@ export default function SpectralChart({
       mode: 'lines',
       name: t('baseline'),
       line: { color: '#30d158', width: 1.5, dash: 'dash' },
-      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Baseline</extra>',
+      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('baseline')}</extra>`,
     });
   }
 
@@ -164,9 +164,9 @@ export function CompareChart({ rawData, processedData, height = 700 }) {
         height,
         xaxis: { ...layout.xaxis, domain: [0, 1], anchor: 'y' },
         margin: { l: 60, r: 30, t: 45, b: 50 },
-        yaxis: { ...layout.yaxis, title: `${t('raw')} · ${t('intensity')}`, domain: [0.58, 1], anchor: 'x' },
+        yaxis: { ...layout.yaxis, title: { text: `${t('raw')} · ${t('intensity')}` }, domain: [0.58, 1], anchor: 'x' },
         xaxis2: { ...layout.xaxis, domain: [0, 1], anchor: 'y2', matches: 'x' },
-        yaxis2: { ...layout.yaxis, title: `${t('processed')} · ${t('intensity')}`, domain: [0, 0.42], anchor: 'x2' },
+        yaxis2: { ...layout.yaxis, title: { text: `${t('processed')} · ${t('intensity')}` }, domain: [0, 0.42], anchor: 'x2' },
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
       style={{ width: '100%', height: '100%' }}

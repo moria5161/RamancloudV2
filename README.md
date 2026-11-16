@@ -8,7 +8,7 @@
 
 Cut, denoise, and correct baselines for spectra, time series, and hyperspectral images.
 
-[Open RamanCloud](https://ramancloud.xmu.edu.cn/preprocessing/) · [Local Setup](LOCAL_SETUP.md) · [Report an Issue](https://github.com/moria5161/RamancloudV2/issues) · [Apache 2.0](LICENSE)
+[Open RamanCloud](https://ramancloud.xmu.edu.cn/) · [Local Setup](LOCAL_SETUP.md) · [Report an Issue](https://github.com/moria5161/RamancloudV2/issues) · [Apache 2.0](LICENSE)
 
 </div>
 
@@ -20,6 +20,7 @@ Cut, denoise, and correct baselines for spectra, time series, and hyperspectral 
 | :--- | :--- | :--- |
 | **Spectral Processing** | Individual spectra and batches of up to 512 files | Build a pipeline, compare curves, and export results or baselines. |
 | **Hyperspectral Processing** | Spectral images and time series | Compare heatmaps, inspect spatial pixels or time points, and export coordinate-preserving data. |
+| **Spectrum–Structure** | SMILES, molecular drawings, and XYZ conformers | View molecules and predict Raman spectra with separately supplied model weights. |
 | **Extra Tools** | Spectral and mapping files | Split mappings, merge spectra, and convert supported instrument formats. |
 
 **Your pipeline, your order.** Arrange cutting, denoising, and baseline correction to suit your data, then adjust the available parameters.
@@ -43,7 +44,7 @@ Batch exports keep the original filenames. Imaging and time-series exports prese
 | Denoising | Savitzky-Golay, Wavelet (WTD), PEER, F2P, TSVD |
 | Baseline correction | AirNet, airPLS, AABS, IModPoly, SNIP |
 
-TSVD operates on multiple aligned spectra. AirNet and F2P use pretrained models; F2P is a masked self-supervised algorithm that has not yet been published.
+TSVD operates on multiple aligned spectra. AirNet and F2P use pretrained models. The current F2P implementation is Fast2PeakRPE, with relative position encoding; see the [Fast2Peak preprint](https://arxiv.org/abs/2610.29753).
 
 Algorithm descriptions and references are available in the website's **Tutorial**.
 
@@ -60,7 +61,9 @@ The **[Local Setup Guide](LOCAL_SETUP.md)** covers installation, backend and fro
 | Browser workspace | React, Plotly |
 | Processing API | FastAPI, NumPy, SciPy, PyWavelets, pybaselines |
 
-AirNet and F2P weights are configured on the hosted website and are not included in this repository.
+This source includes the hosted V2 frontend, backend, model definitions, inference configurations, and preprocessing/postprocessing code. Model weights are separate and are not included in Git, source distributions, or wheels. Private server configuration, visitor databases, and user-upload archives are also excluded.
+
+Supply `f2p_rpe_best.pth` and `airnet.pth` to enable F2P and AirNet. Molecular prediction requires three additional weights. Follow [Local Setup](LOCAL_SETUP.md#optional-pretrained-models) for paths, dependencies, and a verification command. Without private weights, the other processing algorithms remain available.
 
 <details>
 <summary><strong>Data Sharing on the Hosted Website</strong></summary>

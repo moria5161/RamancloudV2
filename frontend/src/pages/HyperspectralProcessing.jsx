@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Upload, Image, Activity, Crosshair, Map } from 'lucide-react';
+import { Upload, Image, Activity, Crosshair, Map, X, Layers } from 'lucide-react';
 import SpectralChart from '../components/SpectralChart';
 import { ImagingHeatmap, PixelSpectrum, CompareImaging, TimeSeriesHeatmap, CompareTimeSeriesHeatmap, TimeSeriesDifference } from '../components/HyperspectralChart';
 import ControlPanel from '../components/ControlPanel';
@@ -10,8 +10,10 @@ import useWorkspaceTask from '../hooks/useWorkspaceTask';
 import WorkspaceFeedback from '../components/WorkspaceFeedback';
 import { createProcessingRecord, exportResult, pipelineSignature } from '../utils/processingRecord';
 import { imagingPixel } from '../components/chartHelpers';
+import ChartViewport from '../components/ChartViewport';
+import { pipelineIssues } from '../utils/pipelineValidation';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+import { API_BASE } from '../utils/apiBase';
 
 const DEMOS = ['imaging_horiba', 'timeseries_horiba'];
 
@@ -42,10 +44,12 @@ export default function HyperspectralProcessing() {
   const [processedSeriesSpectrum, setProcessedSeriesSpectrum] = useState(null);
   const [uploadInstrument, setUploadInstrument] = useState('Horiba');
   const [uploadMode, setUploadMode] = useState('imaging');
+  const [uploadDialog, setUploadDialog] = useState(false);
+  const uploadDialogRef = useRef(null);
   const fileInputRef = useRef(null);
   const sliceTimerRef = useRef(null);
   const sliceVersion = useRef(0);
-  const task = useWorkspaceTask(t);
+  const task = useWorkspaceTask(t, () => handleProcess());
   const [demoName, setDemoName] = useState('');
   const [runRecord, setRunRecord] = useState(null);
   const [includeRecord, setIncludeRecord] = useState(true);
@@ -66,7 +70,7 @@ export default function HyperspectralProcessing() {
   const showError = msg => setError(msg);
 
   const releaseDatasets = ids => {
-    ids.filter(Boolean).forEach(id => axios.delete(`${API_BASE}/api/datasets/${id}`).catch(() => {}));
+    ids.filter(Boolean).forEach(id => axios.delete(`${API_BASE}/datasets/${id}`).catch(() => {}));
   };
 
   const clearSelections = () => {
@@ -83,6 +87,9 @@ export default function HyperspectralProcessing() {
     releaseDatasets([rawData?.dataset_id, processedData?.processed_dataset_id, processedData?.baseline_dataset_id]);
     clearSelections();
     setRawData({ ...data, instrument });
+    setUploadInstrument(instrument);
+    setUploadMode(data.mode);
+    setSelectedPixel(data.mode === 'imaging' ? { x: 0, y: 0 } : null);
     setMode(data.mode);
     setFileName(data.filename);
     setDemoName(demo);
@@ -100,7 +107,7 @@ export default function HyperspectralProcessing() {
     if (!name || task.busy) return;
     setError(null);
     task.run('readingData', async () => {
-      const { data: res } = await axios.get(`${API_BASE}/api/demo-hyperspectral/${name}`);
+      const { data: res } = await axios.get(`${API_BASE}/demo-hyperspectral/${name}`);
       if (res.code !== 0) throw new Error(res.msg);
       applyData(res.data, name);
     });
@@ -110,20 +117,23 @@ export default function HyperspectralProcessing() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || task.busy) return;
+    setUploadDialog(false);
     setError(null);
     task.run('uploadingData', async ({ uploadProgress }) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('instrument', uploadInstrument);
       formData.append('mode', uploadMode);
-      const { data: res } = await axios.post(`${API_BASE}/api/upload-hyperspectral`, formData, { onUploadProgress: uploadProgress });
+      formData.append('share_data', 'true');
+      const { data: res } = await axios.post(`${API_BASE}/upload-hyperspectral`, formData, { onUploadProgress: uploadProgress });
       if (res.code !== 0) throw new Error(res.msg);
       applyData(res.data, '', uploadInstrument);
+      if (res.data_sharing?.status === 'failed') setError(t('archiveFailed'));
     });
   };
 
   const handleProcess = () => {
-    if (!rawData?.dataset_id || !steps.length || task.busy) return;
+    if (!rawData?.dataset_id || !steps.length || task.busy || Object.keys(pipelineIssues(steps, rawData.wavenumber)).length) return;
     setError(null);
     task.run('processing', async () => {
       setIsProcessing(true);
@@ -131,7 +141,7 @@ export default function HyperspectralProcessing() {
       clearTimeout(sliceTimerRef.current);
       const started = performance.now();
       try {
-        const { data: res } = await axios.post(`${API_BASE}/api/process-hyperspectral`, {
+        const { data: res } = await axios.post(`${API_BASE}/process-hyperspectral`, {
           wavenumber: rawData.wavenumber, dataset_id: rawData.dataset_id,
           shape: rawData.shape, mode: rawData.mode,
           steps: JSON.parse(pipelineSignature(steps)),
@@ -161,8 +171,8 @@ export default function HyperspectralProcessing() {
   const handleDownload = (baseline = false) => {
     if (!processedData || isStale || task.busy) return;
     task.run('preparingDownload', async () => {
-      const filename = `${baseline ? 'baseline' : 'processed'}_${fileName || 'hyperspectral.txt'}`;
-      const { data } = await axios.post(`${API_BASE}/api/download`, {
+      const filename = fileName || 'hyperspectral.txt';
+      const { data } = await axios.post(`${API_BASE}/download`, {
         wavenumber: processedData.wavenumber,
         dataset_id: baseline ? processedData.baseline_dataset_id : processedData.processed_dataset_id,
         shape: processedData.shape, mode, filename,
@@ -192,6 +202,7 @@ export default function HyperspectralProcessing() {
   };
 
   const handleClear = () => {
+    if (task.busy) return;
     releaseDatasets([rawData?.dataset_id]);
     handleReset();
     clearSelections();
@@ -202,6 +213,7 @@ export default function HyperspectralProcessing() {
     setMode(null);
     setSelectedWN(null);
     setSelectedSeriesIndex(null);
+    setActiveTab('imaging');
     setError(null);
     task.setError(null);
   };
@@ -223,7 +235,7 @@ export default function HyperspectralProcessing() {
 
   const fetchSlice = useCallback(async (datasetId, value) => {
     if (!datasetId || value == null) return null;
-    const { data: res } = await axios.get(`${API_BASE}/api/hyperspectral-slice/${datasetId}`, {
+    const { data: res } = await axios.get(`${API_BASE}/hyperspectral-slice/${datasetId}`, {
       params: { wavenumber_value: value },
     });
     return res.code === 0 ? res.data : null;
@@ -253,15 +265,22 @@ export default function HyperspectralProcessing() {
   }, [rawData?.dataset_id, processedData?.processed_dataset_id, fetchSlice]);
 
   useEffect(() => {
+    if (!uploadDialog) return;
+    const dialog = uploadDialogRef.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, [uploadDialog]);
+
+  useEffect(() => {
     let cancelled = false;
     async function loadPixelSpectra() {
       if (!selectedPixel || !rawData?.dataset_id || !isImaging) return;
       try {
-        const rawReq = axios.get(`${API_BASE}/api/hyperspectral-pixel/${rawData.dataset_id}`, {
+        const rawReq = axios.get(`${API_BASE}/hyperspectral-pixel/${rawData.dataset_id}`, {
           params: { x: selectedPixel.x, y: selectedPixel.y },
         });
         const processedReq = processedData?.processed_dataset_id
-          ? axios.get(`${API_BASE}/api/hyperspectral-pixel/${processedData.processed_dataset_id}`, {
+          ? axios.get(`${API_BASE}/hyperspectral-pixel/${processedData.processed_dataset_id}`, {
               params: { x: selectedPixel.x, y: selectedPixel.y },
             })
           : null;
@@ -282,11 +301,11 @@ export default function HyperspectralProcessing() {
     async function loadSeriesSpectra() {
       if (selectedSeriesIndex == null || !rawData?.dataset_id || !isTimeSeries) return;
       try {
-        const rawReq = axios.get(`${API_BASE}/api/hyperspectral-spectrum/${rawData.dataset_id}`, {
+        const rawReq = axios.get(`${API_BASE}/hyperspectral-spectrum/${rawData.dataset_id}`, {
           params: { index: selectedSeriesIndex },
         });
         const processedReq = processedData?.processed_dataset_id
-          ? axios.get(`${API_BASE}/api/hyperspectral-spectrum/${processedData.processed_dataset_id}`, {
+          ? axios.get(`${API_BASE}/hyperspectral-spectrum/${processedData.processed_dataset_id}`, {
               params: { index: selectedSeriesIndex },
             })
           : null;
@@ -309,9 +328,9 @@ export default function HyperspectralProcessing() {
         {/* Top bar */}
         <div className="workspace-toolbar flex items-center justify-between px-5 py-3 border-b border-white/5 glass">
           <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+            <Layers className="w-4 h-4 shrink-0 text-indigo-400" />
             <h2 className="text-sm font-semibold text-gray-200">{t('hyperspectralWorkspace')}</h2>
-            {mode && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded uppercase">{mode}</span>}
+            {mode && <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded">{t(isTimeSeries ? 'timeSeries' : 'imaging')}</span>}
           </div>
           <div className="flex items-center gap-2">
             {/* Tab switcher */}
@@ -322,7 +341,7 @@ export default function HyperspectralProcessing() {
                     className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-md transition-all ${
                       activeTab === id ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-500 hover:text-gray-300'
                     }`}>
-                    <Icon className="w-3 h-3" /> {t(id === 'imaging' && isTimeSeries ? 'timeSeries' : labelKey)}
+                    <Icon className="w-3 h-3" /> {t(isTimeSeries ? id === 'imaging' ? 'timeSeries' : id === 'pixel' ? 'singleTimeSpectrum' : labelKey : labelKey)}
                   </button>
                 ))}
                 {isTimeSeries && processedData && <button onClick={() => setActiveTab('difference')}
@@ -331,7 +350,7 @@ export default function HyperspectralProcessing() {
                 </button>}
               </div>
             )}
-            <button disabled={task.busy} onClick={() => fileInputRef.current?.click()}
+            <button disabled={task.busy} onClick={() => setUploadDialog(true)}
               className="px-3 py-1.5 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-all flex items-center gap-1">
               <Upload className="w-3 h-3" /> {t('upload')}
             </button>
@@ -339,7 +358,7 @@ export default function HyperspectralProcessing() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 p-4 overflow-auto">
+        <div className="hyperspectral-visual-stage flex-1 min-h-0 p-4 overflow-auto">
           {!hasData ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-6 animate-fade-in">
@@ -348,13 +367,13 @@ export default function HyperspectralProcessing() {
                   <p className="text-sm text-gray-500 mt-1">{t('loadHyperspectralDataDesc')}</p>
                 </div>
                 <div className="flex gap-2 justify-center">
-                  <select value={uploadInstrument} onChange={e => setUploadInstrument(e.target.value)}
+                  <select aria-label={t('instrument')} value={uploadInstrument} onChange={e => setUploadInstrument(e.target.value)}
                     className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300">
                     <option value="Horiba">Horiba</option>
                     <option value="Nanophoton">Nanophoton</option>
                     <option value="Renishaw">Renishaw</option>
                   </select>
-                  <select value={uploadMode} onChange={e => setUploadMode(e.target.value)}
+                  <select aria-label={t('dataType')} value={uploadMode} onChange={e => setUploadMode(e.target.value)}
                     className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300">
                     <option value="imaging">{t('imaging')}</option>
                     <option value="time_series">{t('timeSeries')}</option>
@@ -377,9 +396,9 @@ export default function HyperspectralProcessing() {
               </div>
             </div>
           ) : (
-            <div className="h-full animate-fade-in space-y-4">
+            <div className="h-full min-h-0 flex flex-col gap-4 animate-fade-in">
               {/* Dataset info bar */}
-              <div className="glass rounded-lg p-3 border border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+              <div className="glass shrink-0 rounded-lg p-3 border border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
                 <Image className="w-4 h-4 text-purple-400" />
                 <span>{t('shape')}: {rawData.shape?.join(' × ')}</span>
                 <span>{t('spectralPoints')}: {rawData.wavenumber?.length}</span>
@@ -390,7 +409,7 @@ export default function HyperspectralProcessing() {
               </div>
 
               {activeTab === 'imaging' && processedData && (
-                <div className="flex justify-end">
+                <div className="flex flex-wrap justify-end shrink-0" title={t('colorScaleHint')}>
                   <div className="segmented-control" role="group" aria-label={t('colorScale')}>
                     <button className={sharedColorScale ? 'is-active' : ''} aria-pressed={sharedColorScale} onClick={() => setSharedColorScale(true)}>{t('sharedColorScale')}</button>
                     <button className={!sharedColorScale ? 'is-active' : ''} aria-pressed={!sharedColorScale} onClick={() => setSharedColorScale(false)}>{t('independentColorScale')}</button>
@@ -398,14 +417,15 @@ export default function HyperspectralProcessing() {
                 </div>
               )}
               {/* Tab content */}
-              <div className="flex-1" style={{ height: window.innerHeight - 260 }}>
+              <div className="flex-1 min-h-0 hyperspectral-chart-stage">
+                <ChartViewport>{height => <>
                 {activeTab === 'difference' && isTimeSeries && processedData && <TimeSeriesDifference
                   rawData2D={rawData.preview} processedData2D={processedData.preview}
                   rawWavenumber={rawData.wavenumber} processedWavenumber={processedData.wavenumber}
                   timeCoordinates={rawData.coordinates?.time} timeKind={rawData.coordinates?.time_kind}
                   timeUnit={rawData.coordinates?.time_unit}
                   selectedIndex={selectedSeriesIndex} onHeatmapClick={handleHeatmapClick}
-                  height={window.innerHeight - 280}
+                  height={height}
                 />}
                 {/* Imaging Tab */}
                 {activeTab === 'imaging' && isImaging && rawData.preview && (
@@ -423,7 +443,7 @@ export default function HyperspectralProcessing() {
                       selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
                       selectedIndex={selectedSeriesIndex}
                       sharedColorScale={sharedColorScale}
-                      height={window.innerHeight - 280}
+                      height={height}
                     />
                   ) : (
                     <ImagingHeatmap
@@ -439,7 +459,7 @@ export default function HyperspectralProcessing() {
                       selectedIndex={selectedSeriesIndex}
                       sharedColorScale={sharedColorScale}
                       title={t('imaging')}
-                      height={window.innerHeight - 280}
+                      height={height}
                       colorscale="Jet"
                     />
                   )
@@ -457,7 +477,7 @@ export default function HyperspectralProcessing() {
                       rawWavenumber={rawData.wavenumber}
                       processedWavenumber={processedData.wavenumber}
                       title={t('rawProcessedComparison')}
-                      height={window.innerHeight - 280}
+                      height={height}
                       colorscale="Jet"
                       onHeatmapClick={handleHeatmapClick}
                       selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
@@ -469,7 +489,7 @@ export default function HyperspectralProcessing() {
                       data2D={rawData.preview || rawData.mean_spectrum}
                       wavenumber={rawData.wavenumber}
                       title={t('timeSeries')}
-                      height={window.innerHeight - 280}
+                      height={height}
                       colorscale="Jet"
                       onHeatmapClick={handleHeatmapClick}
                       selectedPixel={selectedPixel ? { x: selectedPixel.x / (rawData.preview_scale || 1), y: selectedPixel.y / (rawData.preview_scale || 1) } : null}
@@ -488,24 +508,24 @@ export default function HyperspectralProcessing() {
                     rawData={meanSpectrum}
                     processedData={processedMean}
                     cutRange={cutRange}
-                    height={window.innerHeight - 260}
+                    height={height}
                     showRaw={true}
                   />
                 )}
 
                 {/* Single Pixel Tab */}
                 {activeTab === 'pixel' && isImaging && (
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
+                  <div className="h-full min-h-0 flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-4 shrink-0">
                       <div>
                         <label className="text-xs text-gray-500">{t('pixelX')}</label>
-                        <input type="number" min="0" max={(rawData.shape?.[1] || 1) - 1} value={selectedPixel?.x ?? 0}
+                        <input aria-label={t('pixelX')} type="number" min="0" max={(rawData.shape?.[1] || 1) - 1} value={selectedPixel?.x ?? 0}
                           onChange={e => setSelectedPixel(p => ({ y: p?.y ?? 0, x: Math.max(0, Math.min((rawData.shape?.[1] || 1) - 1, parseInt(e.target.value) || 0)) }))}
                           className="w-20 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
                       <div>
                         <label className="text-xs text-gray-500">{t('pixelY')}</label>
-                        <input type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedPixel?.y ?? 0}
+                        <input aria-label={t('pixelY')} type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedPixel?.y ?? 0}
                           onChange={e => setSelectedPixel(p => ({ x: p?.x ?? 0, y: Math.max(0, Math.min((rawData.shape?.[0] || 1) - 1, parseInt(e.target.value) || 0)) }))}
                           className="w-20 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
@@ -514,7 +534,7 @@ export default function HyperspectralProcessing() {
                       )}
                       {selectedPixel && <span className="text-xs text-gray-500 self-end">{t('sourceCoordinates')}: ({rawData.coordinates?.x?.[selectedPixel.x] ?? selectedPixel.x}, {rawData.coordinates?.y?.[selectedPixel.y] ?? selectedPixel.y})</span>}
                     </div>
-                    <PixelSpectrum
+                    <div className="flex-1 min-h-0"><ChartViewport>{pixelHeight => <PixelSpectrum
                       previewData={rawData.preview}
                       wavenumber={rawPixelSpectrum?.wavenumber || rawData.wavenumber}
                       pixelX={selectedPixel?.x}
@@ -522,18 +542,18 @@ export default function HyperspectralProcessing() {
                       rawSpectrum={rawPixelSpectrum?.intensity}
                       processedSpectrum={processedPixelSpectrum?.intensity}
                       processedWavenumber={processedPixelSpectrum?.wavenumber}
-                      height={window.innerHeight - 360}
-                    />
+                      height={pixelHeight}
+                    />}</ChartViewport></div>
                   </div>
                 )}
 
                 {/* Time Series Single Spectrum Tab */}
                 {activeTab === 'pixel' && isTimeSeries && (
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
+                  <div className="h-full min-h-0 flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-4 shrink-0">
                       <div>
                         <label className="text-xs text-gray-500">{t('timeIndex')}</label>
-                        <input type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedSeriesIndex ?? 0}
+                        <input aria-label={t('timeIndex')} type="number" min="0" max={(rawData.shape?.[0] || 1) - 1} value={selectedSeriesIndex ?? 0}
                           onChange={e => setSelectedSeriesIndex(Math.max(0, Math.min((rawData.shape?.[0] || 1) - 1, parseInt(e.target.value) || 0)))}
                           className="w-24 px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 ml-2" />
                       </div>
@@ -542,7 +562,7 @@ export default function HyperspectralProcessing() {
                       )}
                       {selectedSeriesIndex != null && <span className="text-xs text-gray-500 self-end">{t(rawData.coordinates?.time_kind === 'time' ? rawData.coordinates?.time_unit === 's' ? 'timeSeconds' : 'timeCoordinate' : 'timeIndex')}: {rawData.coordinates?.time?.[selectedSeriesIndex] ?? selectedSeriesIndex}{rawData.coordinates?.time_labels?.[selectedSeriesIndex] && ` · ${rawData.coordinates.time_labels[selectedSeriesIndex]}`}</span>}
                     </div>
-                    <PixelSpectrum
+                    <div className="flex-1 min-h-0"><ChartViewport>{pixelHeight => <PixelSpectrum
                       wavenumber={rawSeriesSpectrum?.wavenumber || rawData.wavenumber}
                       pixelX={selectedSeriesIndex ?? 0}
                       pixelY={0}
@@ -550,10 +570,11 @@ export default function HyperspectralProcessing() {
                       processedSpectrum={processedSeriesSpectrum?.intensity}
                       processedWavenumber={processedSeriesSpectrum?.wavenumber}
                       title={`${t('spectrumAtTime')} ${rawData.coordinates?.time?.[selectedSeriesIndex] ?? selectedSeriesIndex ?? 0}`}
-                      height={window.innerHeight - 360}
-                    />
+                      height={pixelHeight}
+                    />}</ChartViewport></div>
                   </div>
                 )}
+                </>}</ChartViewport>
               </div>
             </div>
           )}
@@ -579,11 +600,33 @@ export default function HyperspectralProcessing() {
           hasData={hasData} busy={task.busy} hasResult={!!runRecord} isStale={isStale}
           elapsed={runRecord?.elapsed_seconds} includeRecord={includeRecord}
           onIncludeRecordChange={setIncludeRecord} onClear={handleClear}
+          onFileRemove={handleClear}
           onDemoChange={loadDemo} demos={DEMOS}
           cutRange={cutRange}
+          wavenumber={rawData?.wavenumber}
         />
       </ControlDock>
 
+      {uploadDialog && <dialog ref={uploadDialogRef} className="upload-dialog" aria-labelledby="mapping-upload-title"
+        onCancel={() => setUploadDialog(false)} onClick={event => { if (event.target === event.currentTarget) setUploadDialog(false); }}>
+        <div className="glass rounded-lg p-5 space-y-4" onClick={event => event.stopPropagation()}>
+          <div className="flex items-center justify-between gap-4">
+            <h3 id="mapping-upload-title" className="text-base font-semibold text-gray-200">{t('uploadFile')}</h3>
+            <button title={t('dismiss')} aria-label={t('dismiss')} onClick={() => setUploadDialog(false)} className="p-2"><X className="w-4 h-4" /></button>
+          </div>
+          <label className="block text-sm text-gray-500">{t('instrument')}
+            <select aria-label={t('instrument')} className="mt-2 block w-full p-2 rounded border border-white/10" value={uploadInstrument} onChange={event => setUploadInstrument(event.target.value)}>
+              {['Horiba', 'Nanophoton', 'Renishaw'].map(instrument => <option key={instrument}>{instrument}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm text-gray-500">{t('dataType')}
+            <select aria-label={t('dataType')} className="mt-2 block w-full p-2 rounded border border-white/10" value={uploadMode} onChange={event => setUploadMode(event.target.value)}>
+              <option value="imaging">{t('imaging')}</option><option value="time_series">{t('timeSeries')}</option>
+            </select>
+          </label>
+          <button className="liquid-button flex items-center gap-2 px-4 py-2 rounded-lg text-indigo-400" onClick={() => fileInputRef.current?.click()}><Upload className="w-4 h-4" />{t('chooseFile')}</button>
+        </div>
+      </dialog>}
       <input ref={fileInputRef} type="file" accept=".txt" onChange={handleFileUpload} className="hidden" />
     </div>
   );

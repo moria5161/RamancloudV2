@@ -23,7 +23,7 @@ class ProcessingTests(unittest.TestCase):
         self.y += np.random.default_rng(42).normal(0, 2, 400)
 
     def test_baseline_methods_are_deliberately_limited(self):
-        self.assertEqual(BASELINE_METHODS, ('airpls', 'aabs', 'imodpoly', 'snip', 'skip'))
+        self.assertEqual(BASELINE_METHODS, ('airnet', 'airpls', 'aabs', 'imodpoly', 'snip', 'skip'))
 
     def test_pybaselines_methods_match_v1_library_contract(self):
         for name in ('airpls', 'imodpoly', 'snip'):

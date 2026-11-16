@@ -1,13 +1,16 @@
 import React, { useRef, useState } from 'react';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import { researchCategories } from '../data/research';
 
 export default function RecentResearch() {
   const { language, t } = usePreferences();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const tabs = useRef([]);
   const category = researchCategories[activeIndex];
+  const expanded = Boolean(expandedCategories[category.id]);
+  const visiblePapers = expanded ? category.papers : category.papers.slice(0, 6);
 
   const navigateTabs = (event, index) => {
     let next;
@@ -35,12 +38,12 @@ export default function RecentResearch() {
         </button>)}
       </div>
       <div id="research-panel" role="tabpanel" aria-labelledby={`research-tab-${category.id}`} tabIndex={0}
-        className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {category.papers.map(paper => <article key={paper.url} className="glass rounded-lg border border-white/5 flex flex-col min-w-0">
-          <div className="aspect-[4/3] bg-white/90 p-4">
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {visiblePapers.map(paper => <article key={paper.url} className="glass rounded-lg border border-white/5 flex flex-col min-w-0">
+          {paper.image && <div className="aspect-[4/3] bg-white/90 p-4">
             <img src={`${import.meta.env.BASE_URL}research/${paper.image}`} alt={language === 'zh' ? paper.titleZh : paper.title}
               loading="lazy" decoding="async" className="w-full h-full object-contain" />
-          </div>
+          </div>}
           <div className="p-5 flex flex-col gap-3 flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-gray-200 leading-relaxed break-words">
               <a href={paper.url} target="_blank" rel="noopener noreferrer" title={paper.title} className="hover:text-indigo-400 transition-colors">
@@ -55,6 +58,14 @@ export default function RecentResearch() {
           </div>
         </article>)}
       </div>
+      {category.papers.length > 6 && <div className="flex justify-center">
+        <button type="button" aria-expanded={expanded} aria-controls="research-panel"
+          onClick={() => setExpandedCategories(previous => ({ ...previous, [category.id]: !expanded }))}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm text-gray-400 hover:text-indigo-400 hover:bg-white/5 transition-colors">
+          {t(expanded ? 'showFewerPublications' : 'showMorePublications')}
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+      </div>}
     </section>
   );
 }
