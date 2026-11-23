@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, getLocale, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,7 +13,6 @@ import SpectrumImportConfirmation from '../components/SpectrumImportConfirmation
 import ProjectCollaboration, { ProjectInvitations } from '../components/ProjectCollaboration';
 import './DataWorkspace.css';
 import './ProjectWarehouse.css';
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 const blank = {
   name: '',
   description: '',

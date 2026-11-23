@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, getLocale, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import ModelHistoryResult, {MODEL_ANALYSIS_TYPES,historyTabs,ModelHistorySettings} from '../components/ModelHistoryResult';
@@ -18,7 +19,6 @@ import {spectrumExportTargets} from '../spectrumExport';
 import BatchSpectrumExport from '../components/BatchSpectrumExport';
 import { SpectrumExport, ShareResult, FileExport } from '../components/ResultActions';
 import './DataWorkspace.css';
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 const labels = {
   spectrum: '单光谱',
   hyperspectral: '高光谱',

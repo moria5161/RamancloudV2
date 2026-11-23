@@ -1,3 +1,4 @@
+import { API_BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import {Link} from 'react-router-dom';
@@ -15,7 +16,6 @@ import axiosClient from 'axios';
 import { apiErrorMessage, useAuth } from '../auth';
 import { usePreferences } from '../i18n';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const DEMOS = ['imaging_horiba', 'timeseries_horiba'];
 
@@ -66,7 +66,7 @@ export default function HyperspectralProcessing() {
 
   useEffect(() => {
     const abort = new AbortController();
-    axios.get(`${API_BASE}/api/health`, { signal: abort.signal }).then(({ data }) => setBm3dAvailable(!!data.data?.tshi?.bm3d_available)).catch(() => {});
+    axios.get(`${API_BASE}/health`, { signal: abort.signal }).then(({ data }) => setBm3dAvailable(!!data.data?.tshi?.bm3d_available)).catch(() => {});
     return () => { abort.abort(); clearTimeout(sliceTimerRef.current); sliceRequestRef.current += 1; };
   }, [axios]);
 
@@ -92,7 +92,7 @@ export default function HyperspectralProcessing() {
   const showError = (msg) => setError(msg);
   const fetchSlice = useCallback(async (datasetId, value) => {
     if (!datasetId || value == null) return null;
-    const { data: res } = await axios.get(`${API_BASE}/api/hyperspectral-slice/${datasetId}`, {
+    const { data: res } = await axios.get(`${API_BASE}/hyperspectral-slice/${datasetId}`, {
       params: { wavenumber_value: value },
     });
     return res.code === 0 ? res.data : null;
@@ -106,7 +106,7 @@ export default function HyperspectralProcessing() {
     setIsProcessing(true);
     try {
       setError(null);
-      const { data: res } = await axios.get(`${API_BASE}/api/demo-hyperspectral/${name}`);
+      const { data: res } = await axios.get(`${API_BASE}/demo-hyperspectral/${name}`);
       if (res.code === 0) {
         setRawData(res.data);
         setMode(res.data.mode);
@@ -153,7 +153,7 @@ export default function HyperspectralProcessing() {
       formData.append('layout', matLayout);
       formData.append('pixel_order', pixelOrder);
 
-      const { data: res } = await axios.post(`${API_BASE}/api/upload-hyperspectral`, formData);
+      const { data: res } = await axios.post(`${API_BASE}/upload-hyperspectral`, formData);
       if (res.code === 0) {
         setRawData(res.data);
         setMode(res.data.mode);
@@ -193,7 +193,7 @@ export default function HyperspectralProcessing() {
     try {
       const pipelineSteps = pipeline.map(s => ({ type: s.type, method: s.method, params: s.params }));
 
-      const { data: res } = await axios.post(`${API_BASE}/api/process-hyperspectral`, {
+      const { data: res } = await axios.post(`${API_BASE}/process-hyperspectral`, {
         wavenumber: rawData.wavenumber,
         dataset_id: rawData.dataset_id,
         spectra: rawData.spectra,
@@ -244,7 +244,7 @@ export default function HyperspectralProcessing() {
       const format = isImaging ? downloadFormat : 'txt';
       const name = `processed_${(fileName || 'hyperspectral').replace(/\.[^.]+$/, '')}.${format}`;
       const { data: res } = await axios.post(
-        `${API_BASE}/api/download`,
+        `${API_BASE}/download`,
         processedData?.processed_dataset_id || processedData?.spectra
           ? {
               wavenumber: processedMean.wavenumber,
@@ -328,11 +328,11 @@ export default function HyperspectralProcessing() {
     async function loadPixelSpectra() {
       if (!selectedPixel || !rawData?.dataset_id || !isImaging) return;
       try {
-        const rawReq = axios.get(`${API_BASE}/api/hyperspectral-pixel/${rawData.dataset_id}`, {
+        const rawReq = axios.get(`${API_BASE}/hyperspectral-pixel/${rawData.dataset_id}`, {
           params: { x: selectedPixel.x, y: selectedPixel.y },
         });
         const processedReq = processedData?.processed_dataset_id
-          ? axios.get(`${API_BASE}/api/hyperspectral-pixel/${processedData.processed_dataset_id}`, {
+          ? axios.get(`${API_BASE}/hyperspectral-pixel/${processedData.processed_dataset_id}`, {
               params: { x: selectedPixel.x, y: selectedPixel.y },
             })
           : null;
@@ -353,11 +353,11 @@ export default function HyperspectralProcessing() {
     async function loadSeriesSpectra() {
       if (selectedSeriesIndex == null || !rawData?.dataset_id || !isTimeSeries) return;
       try {
-        const rawReq = axios.get(`${API_BASE}/api/hyperspectral-spectrum/${rawData.dataset_id}`, {
+        const rawReq = axios.get(`${API_BASE}/hyperspectral-spectrum/${rawData.dataset_id}`, {
           params: { index: selectedSeriesIndex },
         });
         const processedReq = processedData?.processed_dataset_id
-          ? axios.get(`${API_BASE}/api/hyperspectral-spectrum/${processedData.processed_dataset_id}`, {
+          ? axios.get(`${API_BASE}/hyperspectral-spectrum/${processedData.processed_dataset_id}`, {
               params: { index: selectedSeriesIndex },
             })
           : null;

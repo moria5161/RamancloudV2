@@ -33,9 +33,9 @@ export default function AnalysisWorkspaces({pages, children}) {
   const [,render] = useState(0);
   const current = pages[location.pathname];
   const existing = cache.current.get(location.pathname);
-  if (!decision.current || decision.current.key!==location.key) {
+  if (decision.current?.currentLocation !== location) {
     const restore=!!current && previousPath.current !== location.pathname && !location.search && !!existing;
-    decision.current={key:location.key,location:restore?existing.location:location,restore};
+    decision.current={currentLocation:location,location:restore?existing.location:location,restore};
     previousPath.current=location.pathname;
   }
   const returning=decision.current.restore;
@@ -43,7 +43,7 @@ export default function AnalysisWorkspaces({pages, children}) {
   const remembered = current ? cache.current.get(location.pathname).location : null;
   useEffect(()=>{
     if (returning && remembered.search) navigate({pathname:location.pathname,search:remembered.search},{replace:true});
-  },[location.key]);
+  },[location]);
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
     return ()=>cancelAnimationFrame(frame);
@@ -52,7 +52,7 @@ export default function AnalysisWorkspaces({pages, children}) {
     const entry=cache.current.get(path);
     const fresh={...location,pathname:path,search:'',hash:'',state:null};
     cache.current.set(path,{location:fresh,generation:(entry?.generation || 0)+1});
-    decision.current={key:location.key,location:fresh,restore:false};
+    decision.current={currentLocation:location,location:fresh,restore:false};
     navigate(path,{replace:true});render(value=>value+1);
   }
   function navigatorFor(path) {

@@ -1,3 +1,4 @@
+import { API_BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import React, { useRef, useState } from 'react';
@@ -7,7 +8,6 @@ import { usePreferences } from '../i18n';
 import { SPECTRAL_ACCEPT } from '../components/ImportReport';
 import './ExtraTools.css';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const tools = [
   { id: 'split', labelKey: 'splitMapping', descKey: 'splitMappingDesc', icon: Scissors },
@@ -74,20 +74,20 @@ export default function ExtraTools() {
       if (mode === 'split') {
         formData.append('file', selectedFiles[0]);
         formData.append('instrument', instrument);
-        endpoint = `${API_BASE}/api/tools/split`;
+        endpoint = `${API_BASE}/tools/split`;
         filename = 'split_files.zip';
       } else if (mode === 'merge') {
         selectedFiles.forEach((file) => formData.append('files', file));
-        endpoint = `${API_BASE}/api/tools/merge`;
+        endpoint = `${API_BASE}/tools/merge`;
         filename = 'merged_mapping.txt';
       } else if (mode === 'standardize') {
         formData.append('file', selectedFiles[0]);
-        endpoint = `${API_BASE}/api/tools/standardize`;
+        endpoint = `${API_BASE}/tools/standardize`;
         filename = 'standard_spectra.zip';
       } else {
         formData.append('file', selectedFiles[0]);
         formData.append('conversion', conversion);
-        endpoint = `${API_BASE}/api/tools/convert`;
+        endpoint = `${API_BASE}/tools/convert`;
         const stem = selectedFiles[0].name.replace(/\.[^.]+$/, '');
         filename = conversion === 'horiba_to_nanophoton' ? `${stem}_to_Nanophoton.txt` : `${stem}_to_Horiba.txt`;
       }

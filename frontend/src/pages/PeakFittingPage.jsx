@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import axios from 'axios';
 import {useSearchParams} from 'react-router-dom';
@@ -20,7 +21,6 @@ import {FileExport} from '../components/ResultActions';
 import './StructureGenerationPage.css';
 import './PeakFittingPage.css';
 
-const BASE=`${import.meta.env.BASE_URL.replace(/\/$/,'')}/api`;
 export function initialPeak(center,width,start,end){return {center,center_min:Math.max(start,center-1),center_max:Math.min(end,center+1),width,width_min:width*.9,width_max:width*1.1,area:null,area_min:0,area_max:null,eta:.5,eta_min:0,eta_max:1,shape:'voigt'};}
 export default function PeakFittingPage(){
   const {token}=useAuth(),{language,theme}=usePreferences(),txt=(zh,en)=>language==='zh'?zh:en;

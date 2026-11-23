@@ -13,8 +13,8 @@ export function useQAExecutionInput(module, inputs, files = [], locked = false) 
   }, [module]);
 }
 
-export function executionInput() {
-  const module = window.location.pathname.split('/').filter(Boolean).at(-1);
+export function executionInput(path) {
+  const module = path.split('/').filter(Boolean).at(-1);
   const detail = { module, value: null };
   document.dispatchEvent(new CustomEvent('qa-read-execution-input', { detail }));
   return detail.value;

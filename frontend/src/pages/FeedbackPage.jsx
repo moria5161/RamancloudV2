@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText } from '../locale.js';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
@@ -11,7 +12,6 @@ import { localize } from '../content/platformGuide';
 import './LearningPages.css';
 import '../components/Feedback.css';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
 export default function FeedbackPage() {
   const { user, token } = useAuth(), { language, t } = usePreferences();

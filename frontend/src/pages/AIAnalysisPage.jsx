@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,7 +19,6 @@ import { WORKFLOW_STAGES, initialStage, uploadNextStage, selectedBand, spectrumR
 import './AIAnalysisPage.css';
 import {NewAnalysisButton,useWorkspaceList} from '../components/AnalysisWorkspaces';
 
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 const clone = value => JSON.parse(JSON.stringify(value));
 const stageIcons = [Upload, Sparkles, Eye];
 function errorText(error) { return typeof error?.response?.data?.detail === 'string' ? error.response.data.detail : error?.message || localize("请求失败"); }

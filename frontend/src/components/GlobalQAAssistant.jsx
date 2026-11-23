@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { usePreferences } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
@@ -13,7 +14,6 @@ import QAPlanCard from './QAPlanCard';
 import { checkPlanContext, executeQAPlan, executionInput, executionKey } from './qaExecution';
 import {addPlanToTimeline,updateTimelinePlan,chatHistory} from './qaTimeline';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 const ACCEPT = SPECTRAL_ACCEPT;
 const RUNNING = ['queued', 'running', 'stopping'];
 export default function GlobalQAAssistant({ enabled }) {
@@ -31,7 +31,7 @@ export default function GlobalQAAssistant({ enabled }) {
   const [error, setError] = useState(''), [config, setConfig] = useState(null);
   const [phase, setPhase] = useState('');
   const [includeTask, setIncludeTask] = useState(true);
-  const [screen, setScreen] = useState(() => screenContext(false));
+  const [screen, setScreen] = useState(() => screenContext(location.pathname, false));
   const [copied, setCopied] = useState(null);
   const [plan, setPlan] = useState(null);
   const [, refreshExecution] = useState(0);
@@ -92,7 +92,7 @@ export default function GlobalQAAssistant({ enabled }) {
   useEffect(() => {
     if (!enabled) return;
     const update = () => { setScreen(previous => {
-      const next = screenContext(false);
+      const next = screenContext(location.pathname, false);
       return JSON.stringify({ ...previous, observed_at: '' }) === JSON.stringify({ ...next, observed_at: '' }) ? previous : next;
     }); };
     update();
@@ -139,7 +139,7 @@ export default function GlobalQAAssistant({ enabled }) {
     }
   }
   function getRunContext() {
-    const selected = includeTask ? executionInput() : null;
+    const selected = includeTask ? executionInput(location.pathname) : null;
     const context = selected?.module === 'ai-analysis' ? selected : null;
     if (!spectrum) return context;
     if (context?.inputs?.source) {
@@ -214,7 +214,7 @@ export default function GlobalQAAssistant({ enabled }) {
     const history = chatHistory(pageMessages).slice(-6).map(({ role, content }) => ({ role, content: content.slice(0, 3000) }));
     const form = new FormData(); form.append('message', text);
     form.append('history', JSON.stringify(history));
-    const context = includeTask ? screenContext() : { path: window.location.pathname };
+    const context = includeTask ? screenContext(location.pathname) : { path: location.pathname };
 
     form.append('allow_ai', 'true'); form.append('page_context', JSON.stringify(context));
     const currentTask = includeTask ? currentQATask() : null;

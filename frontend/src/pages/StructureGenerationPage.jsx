@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import {NewAnalysisButton,useWorkspaceList} from '../components/AnalysisWorkspaces';
@@ -19,7 +20,6 @@ import StructureGenerationResults from '../components/StructureGenerationResults
 import { LAYOUT_CANDIDATES, makeGenerationDraft, modelCoverage, validFormula, validateSpectrum, workflowSpectrum } from './structureGeneration';
 import './StructureGenerationPage.css';
 
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 
 function downloadJson(value, filename) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));

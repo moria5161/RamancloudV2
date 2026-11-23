@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import {NewAnalysisButton,useWorkspaceList} from '../components/AnalysisWorkspaces';
@@ -20,7 +21,6 @@ import { hasBaseline, matchingSource } from './libraryMatching';
 import './StructureGenerationPage.css';
 import './LibraryMatchingPage.css';
 
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 
 export default function LibraryMatchingPage() {
   const { token } = useAuth();

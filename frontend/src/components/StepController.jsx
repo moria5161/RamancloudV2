@@ -1,3 +1,4 @@
+import { API_BASE } from '../apiBase';
 import { systemText, localize } from '../locale.js';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -24,7 +25,7 @@ const BASELINE_OPTIONS = [{value:'skip',labelKey:'skip'}];
 export default function StepController({ steps, onChange, defaultCutRange, tshiContext, horizontal = false }) {
   const {token}=useAuth();
   const [legacyStatus,setLegacyStatus]=useState({});
-  useEffect(()=>{const abort=new AbortController();axios.get(`${import.meta.env.BASE_URL.replace(/\/$/,'')}/api/legacy-algorithms`,{headers:{Authorization:`Bearer ${token}`},signal:abort.signal}).then(({data})=>setLegacyStatus(Object.fromEntries(data.algorithms.map(s=>[s.method,s])))).catch(()=>{});return()=>abort.abort();},[token]);
+  useEffect(()=>{const abort=new AbortController();axios.get(`${API_BASE}/legacy-algorithms`,{headers:{Authorization:`Bearer ${token}`},signal:abort.signal}).then(({data})=>setLegacyStatus(Object.fromEntries(data.algorithms.map(s=>[s.method,s])))).catch(()=>{});return()=>abort.abort();},[token]);
   const [expandedStep, setExpandedStep] = useState(null);
   const { t } = usePreferences();
 

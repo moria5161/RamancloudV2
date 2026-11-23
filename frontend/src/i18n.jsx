@@ -1,3 +1,4 @@
+import { API_BASE } from './apiBase';
 import { accountLanguageKey, getLocale, localize, readLanguage, saveLanguage, setActiveLanguage, validLanguage } from './locale.js';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
@@ -529,7 +530,7 @@ export function PreferencesProvider({ children }) {
   const [languageError, setLanguageError] = useState(false);
   const guestChoice = useRef(null), revision = useRef(0), saves = useRef(Promise.resolve());
   const [theme, setTheme] = useState(() => localStorage.getItem('ramancloud_theme') || 'light');
-  const endpoint = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/account/preferences`;
+  const endpoint = `${API_BASE}/account/preferences`;
   // Child renderers and non-React validation helpers use the same current locale.
   setActiveLanguage(language);
 

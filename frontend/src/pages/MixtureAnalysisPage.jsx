@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, getLocale, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import MixtureResult from '../components/MixtureResult';
@@ -22,7 +23,6 @@ import { activeTask, appendStandard, commonBand, readyModels } from './mixtureAn
 import './StructureGenerationPage.css';
 import './MixtureAnalysisPage.css';
 
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 
 function SpectrumPicker({ api, txt, tasks, title, onSelect, disabled, onError, onLoading }) {
   usePreferences();

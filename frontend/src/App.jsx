@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import GlobalQAAssistant from './components/GlobalQAAssistant';
 import SettingsPanel from './components/SettingsPanel';
@@ -85,8 +85,9 @@ function AppShell() {
 }
 
 function App() {
+  const Router = import.meta.env.BASE_URL === '/' ? HashRouter : BrowserRouter;
   return (
-    <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+    <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
       <AuthProvider>
         <PreferencesProvider>
           <AppShell />

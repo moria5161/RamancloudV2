@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText, getLocale } from '../locale.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
@@ -6,7 +7,6 @@ import { apiErrorMessage, useAuth } from '../auth';
 import { usePreferences } from '../i18n';
 import './ProjectCollaboration.css';
 
-const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 const actions = { invite: '发出邀请', accept_invitation: '接受邀请', decline_invitation: '拒绝邀请', revoke_invitation: '撤销邀请', change_role: '变更角色', leave: '退出项目', remove_member: '移除成员', transfer: '转让所有权', publish_result: '发布结果', unpublish_result: '撤下结果', create_project: '创建项目', update_project: '更新项目', upload_dataset: '上传数据', delete_dataset: '删除数据', download_dataset: '下载数据', download_result: '下载结果' };
 actions.warehouse_result = '保存结果到处理后仓库';
 actions.withdraw_warehouse = '从处理后仓库移除结果';

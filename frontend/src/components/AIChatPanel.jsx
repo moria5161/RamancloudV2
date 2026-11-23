@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText } from '../locale.js';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
@@ -7,7 +8,6 @@ import { apiErrorMessage, useAuth } from '../auth';
 import { usePreferences } from '../i18n';
 import './AIChatPanel.css';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
 export default function AIChatPanel({ surface, context = {}, onApplyCommand, blocked = false }) {
   const { token } = useAuth();

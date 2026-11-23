@@ -34,3 +34,9 @@ sudo -u ramancloud-alpha env RAMANCLOUD_DATA_DIR=/var/lib/ramancloud-alpha \
 Ask the second maintainer to register individually. In **Personal Space → Account management**, the first administrator can promote that account. Administrators can see account profile information, status and roles and manage feedback. Passwords and session tokens are excluded from the account list. Verify that an ordinary account receives HTTP 403 for that list.
 
 For code rollback, return the `current` symlink to the previous release and restart alpha. For schema changes, test the compatibility of the previous release first and use a coordinated data restore when needed.
+
+## Serve the optimized release at the existing website address
+
+Build the frontend with `RAMANCLOUD_BASE_PATH=/ VITE_RAMANCLOUD_API_BASE=/ramancloud-api npm run build`. The root build uses hash routes so requests for bookmarked workspace pages reach the existing gateway at `/`. Deploy the build in a versioned static directory and point the Nginx website root to it. Forward `/ramancloud-api/` to `http://127.0.0.1:5001/alpha/api/` to use the verified release's backend and persistent state.
+
+Back up the active Nginx configuration before switching the root and API. Validate the configuration, reload Nginx, and verify the homepage, a workspace bookmark, an asset, and the API at the existing HTTPS address. To roll back, restore the backed-up configuration, test it, and reload Nginx. Keep both releases and their data directories available during the rollback period.

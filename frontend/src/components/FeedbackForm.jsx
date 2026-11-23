@@ -1,3 +1,4 @@
+import { API_BASE as BASE } from '../apiBase';
 import { systemText } from '../locale.js';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import axios from 'axios';
@@ -9,7 +10,6 @@ import { FEEDBACK_CATEGORIES, feedbackRequestId } from '../content/feedback';
 import { localize } from '../content/platformGuide';
 import './Feedback.css';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
 export default function FeedbackForm({ onSubmitted }) {
   const { user, token } = useAuth();

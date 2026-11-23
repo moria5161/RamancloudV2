@@ -1,8 +1,9 @@
+import { API_BASE } from './apiBase';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
-const TOKEN_KEY = API_BASE === '/preprocessing' ? 'ramancloud_auth_token' : `ramancloud_auth_token:${API_BASE}`;
+const routeBase = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+const TOKEN_KEY = routeBase === '/preprocessing' ? 'ramancloud_auth_token' : `ramancloud_auth_token:${routeBase}`;
 
 const AuthContext = createContext(null);
 
@@ -40,7 +41,7 @@ export function AuthProvider({ children }) {
       return null;
     }
     try {
-      const { data } = await axios.get(`${API_BASE}/api/auth/me`, {
+      const { data } = await axios.get(`${API_BASE}/auth/me`, {
         headers: authHeaders(nextToken),
         timeout: 10000,
       });
@@ -60,13 +61,13 @@ export function AuthProvider({ children }) {
   }, [refreshUser]);
 
   const login = useCallback(async ({ identifier, password }) => {
-    const { data } = await axios.post(`${API_BASE}/api/auth/login`, { identifier, password }, { timeout: 15000 });
+    const { data } = await axios.post(`${API_BASE}/auth/login`, { identifier, password }, { timeout: 15000 });
     saveSession(data.data.token, data.data.user);
     return data.data.user;
   }, [saveSession]);
 
   const register = useCallback(async (payload) => {
-    const { data } = await axios.post(`${API_BASE}/api/auth/register`, payload, { timeout: 15000 });
+    const { data } = await axios.post(`${API_BASE}/auth/register`, payload, { timeout: 15000 });
     saveSession(data.data.token, data.data.user);
     return data.data.user;
   }, [saveSession]);
@@ -74,7 +75,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     if (token) {
       try {
-        await axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: authHeaders(), timeout: 5000 });
+        await axios.post(`${API_BASE}/auth/logout`, {}, { headers: authHeaders(), timeout: 5000 });
       } catch (error) {
         // The local session should still be cleared if the server already forgot it.
       }
@@ -84,7 +85,7 @@ export function AuthProvider({ children }) {
 
   const changePassword = useCallback(async ({ oldPassword, newPassword }) => {
     await axios.post(
-      `${API_BASE}/api/auth/change-password`,
+      `${API_BASE}/auth/change-password`,
       { old_password: oldPassword, new_password: newPassword },
       { headers: authHeaders() }
     );
@@ -92,17 +93,17 @@ export function AuthProvider({ children }) {
   }, [authHeaders, clearSession]);
 
   const loadSpace = useCallback(async () => {
-    const { data } = await axios.get(`${API_BASE}/api/account/space`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/account/space`, { headers: authHeaders() });
     return data.data;
   }, [authHeaders]);
 
   const listUsers = useCallback(async () => {
-    const { data } = await axios.get(`${API_BASE}/api/users`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/users`, { headers: authHeaders() });
     return data.data.users;
   }, [authHeaders]);
 
   const updateUser = useCallback(async (userId, payload) => {
-    const { data } = await axios.patch(`${API_BASE}/api/users/${userId}`, payload, { headers: authHeaders() });
+    const { data } = await axios.patch(`${API_BASE}/users/${userId}`, payload, { headers: authHeaders() });
     if (data.data.user.id === user?.id) {
       setUser(data.data.user);
     }

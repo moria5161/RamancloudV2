@@ -17,9 +17,9 @@ export const QA_PAGES = {
 };
 
 // Pages explicitly publish only task information. Never collect arbitrary form values or whole DOM text.
-export function screenContext(withCharts = true) {
+export function screenContext(path, withCharts = true) {
   const workspace = document.querySelector('[data-qa-workspace]');
-  const slug = window.location.pathname.split('/').filter(Boolean).at(-1);
+  const slug = path.split('/').filter(Boolean).at(-1);
   let state = {};
   try {
     const raw = activeNode('[data-qa-state]')?.dataset.qaState;
@@ -48,7 +48,7 @@ export function screenContext(withCharts = true) {
     });
     if (traces.length) charts.push({ traces });
   });
-  return { path: window.location.pathname, page: localize(QA_PAGES[slug]) || localize("平台页面"),
+  return { path, page: localize(QA_PAGES[slug]) || localize("平台页面"),
     observed_at: new Date().toISOString(), state, headings: labels('h1,h2'),
     notices: labels('[role="alert"],[role="status"]'), charts,
     scope: localize("当前平台工作区的结构化状态，不是屏幕图像；未读取其他窗口、密码或任意表单") };
