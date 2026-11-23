@@ -1,106 +1,79 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Activity, Layers, Atom, Wrench, BookOpen } from 'lucide-react';
+import { ArrowRight, Atom, BookOpen, Database, FileCheck2, FolderKanban, GitBranch, Github, History, Layers, LineChart, Mail, MessageCircle, Sparkles, Wrench } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import { ANALYSIS_GUIDES, ASSISTANT_GUIDE_TITLE, localize } from '../content/platformGuide';
 import RecentResearch from '../components/RecentResearch';
-import Feedback from '../components/Feedback';
+import './LearningPages.css';
+
+const ICONS = { sparkles: Sparkles, branches: GitBranch, database: Database, atom: Atom, layers: Layers, 'line-chart': LineChart };
+const ANALYSIS_DESTINATIONS = ANALYSIS_GUIDES.filter(guide => guide.id !== 'preprocessing');
 
 export default function HomePage() {
-  const { t } = usePreferences();
+  const { language } = usePreferences();
+  const text = value => localize(value, language);
+  const txt = (zh, en) => text([zh, en]);
+
   return (
-    <div className="home-page h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-12 space-y-12 animate-fade-in">
-        {/* Hero */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
-            <Sparkles className="w-3 h-3" />
-            {t('nextGenPlatform')}
+    <div className="learning-page home-page">
+      <div className="learning-container home-container animate-fade-in">
+        <header className="home-hero">
+          <div className="home-intro">
+            <p className="learning-eyebrow"><Sparkles size={15} />{txt('拉曼光谱分析工作台', 'Your Raman analysis workspace')}</p>
+            <h1>RamanCloud</h1>
+            <p className="home-tagline">{txt('光谱导入、处理与解析。', 'Import, process and analyze spectra.')}</p>
+
+            <div className="learning-actions">
+              <Link to="/ai-analysis" className="learning-primary">{txt('开始处理光谱', 'Process a spectrum')}<ArrowRight size={16} /></Link>
+              <Link to="/tutorial#quick-start" className="learning-button"><BookOpen size={16} />{txt('查看使用教程', 'Read the guide')}</Link>
+            </div>
           </div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">
-            RamanCloud
-          </h1>
-          <p className="text-lg text-gray-400 max-w-xl mx-auto">
-            {t('heroSubtitle')}
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center pt-2">
-            <Link to="/spectral" className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium hover:from-indigo-500 hover:to-purple-500 transition-all shadow-lg shadow-indigo-500/20">
-              {t('getStarted')}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link to="/tutorial" className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 text-gray-300 text-sm font-medium hover:bg-white/10 border border-white/5 transition-all">
-              <BookOpen className="w-4 h-4" />
-              {t('tutorial')}
-            </Link>
+          <div className="home-workflow" aria-label={txt('光谱分析流程', 'Spectral analysis workflow')}>
+            <div className="home-flow-step"><span className="learning-number">01</span><div><strong>{txt('导入与检查', 'Import & check')}</strong><p>{txt("识别格式 · 确认单位", "Detect format · Check units")}</p></div><FileCheck2 size={20} /></div>
+            <div className="home-flow-step"><span className="learning-number">02</span><div><strong>{txt('光谱预处理', 'Preprocess')}</strong><p>{txt('去鬼峰 → 降噪 → 基线校正', 'Despike → Denoise → Correct baseline')}</p></div><Sparkles size={20} /></div>
+            <div className="home-flow-step home-flow-branch">
+              <span className="learning-number">03</span>
+              <div>
+                <strong>{txt('按目标选择分析', 'Choose an analysis')}</strong>
+                <div className="home-branch-links">
+                  {ANALYSIS_DESTINATIONS.map(guide => <Link key={guide.id} to={guide.to}>{text(guide.title)}<ArrowRight size={12} /></Link>)}
+                </div>
+              </div>
+            </div>
+
           </div>
-        </div>
+        </header>
 
-        {/* Processing modules */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-200">{t('processingModules')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link to="/spectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-200">{t('spectralProcessing')}</h3>
-                  <p className="text-[10px] text-gray-500">{t('singleSpectrum')}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                {t('spectralDesc')}
-              </p>
-            </Link>
-
-            <Link to="/hyperspectral" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <Layers className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-200">{t('hyperspectralProcessing')}</h3>
-                  <p className="text-[10px] text-gray-500">{t('imagingTimeSeries')}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                {t('hyperspectralDesc')}
-              </p>
-            </Link>
-
-            <Link to="/spectrum-structure" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 shrink-0 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <Atom className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-gray-200">{t('spectrumStructure')}</h3>
-                  <p className="text-[10px] text-gray-500">{t('molecularSpectroscopy')}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{t('spectrumStructureDesc')}</p>
-            </Link>
-
-            <Link to="/extra-tools" className="glass liquid-card rounded-xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <Wrench className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-200">{t('extraTools')}</h3>
-                  <p className="text-[10px] text-gray-500">{t('fileUtilities')}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                {t('extraToolsDesc')}
-              </p>
-            </Link>
+        <section className="home-modules" aria-labelledby="home-modules-title">
+          <div className="learning-section-heading"><div><h2 id="home-modules-title">{txt('选择需要的功能', 'Choose a workflow')}</h2></div><Link to="/tutorial#reading-requirements" className="learning-text-link">{txt('先了解输入要求', 'Check input requirements')}<ArrowRight size={14} /></Link></div>
+          <div className="home-module-grid">
+            {ANALYSIS_GUIDES.map(guide => {
+              const Icon = ICONS[guide.icon];
+              return <article key={guide.id} className={`home-module ${guide.id === 'preprocessing' ? 'home-module-featured' : ''}`}>
+                <div className="home-module-top"><span className="learning-icon"><Icon size={22} /></span><span className="learning-tag">{text(guide.tag)}</span></div>
+                <h3><Link to={guide.to}>{text(guide.title)}</Link></h3>
+                <p className="learning-muted">{text(guide.description)}</p>
+                <p className="home-module-requirement">{text(guide.requirement)}</p>
+                <div className="home-module-actions"><Link to={guide.to} className="learning-text-link">{txt('进入功能', 'Open workflow')}<ArrowRight size={15} /></Link><Link to={`/tutorial#${guide.id}`} className="learning-text-link learning-secondary-link">{txt('操作教程', 'How to use')}</Link></div>
+              </article>;
+            })}
           </div>
-        </div>
+
+        </section>
+
+        <section className="home-data-section" aria-labelledby="home-data-title">
+          <div className="learning-section-heading"><div><h2 id="home-data-title">{txt('记录与常用工具', 'Records & useful tools')}</h2></div></div>
+          <div className="home-resource-grid">
+            <Link to="/projects" className="home-resource"><FolderKanban size={22} /><div><h3>{txt('项目与数据', 'Projects & data')}</h3><p>{txt("管理实验数据，共享项目结果。", "Manage data and share project results.")}</p></div><ArrowRight size={16} /></Link>
+            <Link to="/analysis-history" className="home-resource"><History size={22} /><div><h3>{txt('分析记录', 'Analysis records')}</h3><p>{txt('继续任务、查看结果，单个或批量导出。', 'Resume tasks, review results and export individually or in batches.')}</p></div><ArrowRight size={16} /></Link>
+            <Link to="/extra-tools" className="home-resource"><Wrench size={22} /><div><h3>{txt('附加工具', 'Extra Tools')}</h3><p>{txt('拆分 Mapping、合并光谱与格式转换。', 'Split mappings, merge spectra and convert formats.')}</p></div><ArrowRight size={16} /></Link>
+            <Link to="/tutorial#assistant" className="home-resource"><MessageCircle size={22} /><div><h3>{text(ASSISTANT_GUIDE_TITLE)}</h3><p>{txt('在分析页询问结果。在智能光谱处理使用一键预处理或定制方案。', 'Ask about results on analysis pages. Use quick preprocessing or draft a custom plan in Intelligent Spectrum Processing.')}</p></div><ArrowRight size={16} /></Link>
+          </div>
+          <div className="home-format-strip"><FileCheck2 size={20} /><div><strong>{txt('不同仪器，统一波数—强度', 'Instrument data, standardized axes')}</strong><p>{txt('TXT · CSV · XLSX · JCAMP · WDF · WXD · L6M · NPG', 'TXT · CSV · XLSX · JCAMP · WDF · WXD · L6M · NPG')}</p></div><Link to="/tutorial#import" className="learning-text-link">{txt('导入说明', 'Import guide')}<ArrowRight size={14} /></Link></div>
+        </section>
 
         <RecentResearch />
-
-        <Feedback />
+        <footer className="learning-footer"><p>Ren Research Group · Xiamen University</p><div><a href="mailto:xinyulu@stu.xmu.edu.cn" aria-label={txt('邮件联系', 'Contact by email')}><Mail size={17} /></a><a href="https://github.com/hzh040518/Ramancloud" target="_blank" rel="noopener noreferrer" aria-label={txt('RamanCloud 当前代码仓库', 'Current RamanCloud repository')}><Github size={17} /><span>GitHub</span></a></div></footer>
       </div>
     </div>
   );

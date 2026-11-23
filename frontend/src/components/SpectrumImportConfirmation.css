@@ -1,0 +1,15 @@
+.spectrum-import-confirmation { border: 1px solid var(--rc-border); border-left: 3px solid #087e8b; border-radius: 6px; padding: 20px !important; margin: 20px 0; background: var(--rc-surface-solid); min-width: 0; }
+.spectrum-import-confirmation > p { margin: 12px 0; line-height: 1.7; }
+.spectrum-import-confirmation > small { display: block; margin-top: 12px; }
+.spectrum-import-items { max-height: 460px; overflow-y: auto; margin: 16px 0; }
+.spectrum-import-items article { padding: 14px 0; border-top: 1px solid var(--rc-border); overflow-wrap: anywhere; }
+.spectrum-import-items h3 { font-size: 13px; font-weight: 600; }
+.spectrum-import-items p, .spectrum-import-items li, .spectrum-import-items summary { font-size: 12px; line-height: 1.8; margin-top: 6px; }
+.spectrum-import-items p svg { display: inline; vertical-align: middle; }
+.spectrum-import-items ul { padding-left: 18px; list-style: disc; color: var(--rc-secondary); }
+.spectrum-import-items details { margin-top: 12px; }
+.spectrum-import-items summary { cursor: pointer; }
+.spectrum-position-select { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; font-size: 13px; }
+.spectrum-position-select select { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--rc-hairline); border-radius: 8px; background: var(--rc-surface-solid); color: var(--rc-text); }
+.spectrum-import-items table { width: 100%; border-collapse: collapse; margin-top: 8px; text-align: left; font-size: 12px; font-variant-numeric: tabular-nums; }
+.spectrum-import-items th, .spectrum-import-items td { padding: 7px 8px; border-bottom: 1px solid var(--rc-border); }

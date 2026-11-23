@@ -1,0 +1,11 @@
+.quality-report { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rc-hairline); color: var(--rc-text); font-size: 12px; }
+.quality-report h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.quality-report h3 span { color: var(--rc-secondary); font-size: 12px; font-weight: 400; }
+.quality-report p, .quality-unchecked { color: var(--rc-secondary); line-height: 1.7; margin: 8px 0; overflow-wrap: anywhere; }
+.quality-report details { padding: 10px 0; border-bottom: 1px solid var(--rc-hairline); }
+.quality-report summary { cursor: pointer; font-size: 12px; color: var(--rc-text); overflow-wrap: anywhere; }
+.quality-table { width: 100%; overflow-x: auto; }
+.quality-table table { width: 100%; min-width: 340px; border-collapse: collapse; text-align: left; font-size: 12px; }
+.quality-table th, .quality-table td { padding: 8px; border-bottom: 1px solid var(--rc-hairline); overflow-wrap: anywhere; }
+.quality-table th { font-weight: 500; color: var(--rc-secondary); }
+.ai-workspace .quality-marker-toggle { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-top: 12px; color: var(--rc-secondary); font-size: 12px; }

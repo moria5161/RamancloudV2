@@ -1,0 +1,186 @@
+[
+  {
+    "type": "denoise",
+    "method": "sg",
+    "original_method": "sg",
+    "label": "Savitzky-Golay",
+    "params": {
+      "window_size": {
+        "default": 7,
+        "min": 3,
+        "max": 10001,
+        "label": "窗口大小（奇数）",
+        "integer": true
+      },
+      "order": {
+        "default": 3,
+        "min": 0,
+        "max": 20,
+        "label": "多项式阶数",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "denoise",
+    "method": "wtd",
+    "original_method": "wtd",
+    "label": "Wavelet (WTD)",
+    "params": {
+      "wavelet": {
+        "default": "db3",
+        "options": [
+          "db1",
+          "db2",
+          "db3",
+          "db4",
+          "db5",
+          "db6",
+          "db7",
+          "db8",
+          "db9"
+        ],
+        "label": "小波类型"
+      },
+      "level": {
+        "default": 3,
+        "min": 1,
+        "max": 20,
+        "label": "分解层数",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "denoise",
+    "method": "peer",
+    "original_method": "peer",
+    "label": "PEER 峰提取保留",
+    "params": {
+      "loops": {
+        "default": 3,
+        "min": 1,
+        "max": 20,
+        "label": "循环次数",
+        "integer": true
+      },
+      "half_k_threshold": {
+        "default": 2,
+        "min": 0,
+        "max": 7,
+        "label": "峰搜索半宽",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "denoise",
+    "method": "tsvd",
+    "original_method": "tsvd",
+    "label": "TSVD 奇异值曲率筛选",
+    "params": {
+      "threshold": {
+        "default": 0.001,
+        "min": 0,
+        "max": 100,
+        "label": "曲率阈值",
+        "integer": false
+      }
+    }
+  },
+  {
+    "type": "denoise",
+    "method": "f2p",
+    "original_method": "f2p",
+    "label": "Fast2Peak / F2P",
+    "params": {}
+  },
+  {
+    "type": "baseline",
+    "method": "airnet",
+    "original_method": "airnet",
+    "label": "AirNet",
+    "params": {}
+  },
+  {
+    "type": "baseline",
+    "method": "airpls",
+    "original_method": "airpls",
+    "label": "AirPLS 自适应重加权",
+    "params": {
+      "lam": {
+        "default": 10000000.0,
+        "min": 1e-12,
+        "max": 1000000000000.0,
+        "label": "平滑系数 λ",
+        "integer": false
+      },
+      "diff_order": {
+        "default": 3,
+        "min": 1,
+        "max": 3,
+        "label": "差分阶数",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "baseline",
+    "method": "aabs",
+    "original_method": "aabs",
+    "label": "AABS 自适应基线",
+    "params": {
+      "Ln": {
+        "default": 6,
+        "min": 2,
+        "max": 100,
+        "label": "Ln",
+        "integer": true
+      },
+      "Lb": {
+        "default": 140,
+        "min": 5,
+        "max": 1000,
+        "label": "Lb",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "baseline",
+    "method": "imodpoly",
+    "original_method": "imodpoly",
+    "label": "IModPoly 迭代修正多项式",
+    "params": {
+      "poly_order": {
+        "default": 3,
+        "min": 0,
+        "max": 10,
+        "label": "多项式阶数",
+        "integer": true
+      }
+    }
+  },
+  {
+    "type": "baseline",
+    "method": "snip",
+    "original_method": "snip",
+    "label": "SNIP 迭代削峰",
+    "params": {
+      "max_half_window": {
+        "default": 20,
+        "min": 1,
+        "max": 1000,
+        "label": "最大半窗口",
+        "integer": true
+      },
+      "smooth_half_window": {
+        "default": 7,
+        "min": 0,
+        "max": 1000,
+        "label": "平滑半窗口",
+        "integer": true
+      }
+    }
+  }
+]

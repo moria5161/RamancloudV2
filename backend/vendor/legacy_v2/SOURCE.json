@@ -1,0 +1,25 @@
+{
+  "source": "Local RamancloudV2-main 2.2.0",
+  "original_repository": "https://github.com/moria5161/RamancloudV2",
+  "license": "Apache-2.0; see LICENSE",
+  "weights_included": false,
+  "files": {
+    "processing.py": "3bb07824fd8038a728eeb3783608dde04c2b6716db94c0d05dc5ebb7c90a0c12",
+    "__init__.py": "0adf9726fb661e2135ccac654b75f70fa7638172f2f50f14377c32de2fab91df",
+    "baseline_cor/aabs.py": "b14271cb8b3b9ddb35936893649b33af45ad3a855313692a2046a10cdfefa74f",
+    "baseline_cor/airnet.py": "9fedc989b529c2df3ea9863709e88fd6bba8f717f77db0a568ee8e766c0c5149",
+    "baseline_cor/airpls.py": "d785bbca8bf7fe1105d2332878c89ef3c3331a48be325e77ef123855a9286671",
+    "baseline_cor/imodpoly.py": "a82e20c0b1013b4e40b50cabfa23435b5cc38e2dfb6fd481dfc32702dd73ebe9",
+    "baseline_cor/snip.py": "6c221dcade8125aa31fa5fdf4eb3e2b89a129d47e280f67ae65e340617229765",
+    "baseline_cor/__init__.py": "abab531730502f0ffc5c353e4fd580a6dfa95c1378aebd0674c594ec09f1f03d",
+    "denoising/peer.py": "84c191bea73bd29bba8050139c089229998a9b8564badd761f9680463ae689ce",
+    "denoising/sg.py": "bb18cf0a32db5a850665c2c8ce76b2d9048b00318d3ab8ebb602333a51d0d3bd",
+    "denoising/tsvd.py": "410f83fc8a50155eb11482d1d347fafc49775c669519ba7e561d56ab86c751aa",
+    "denoising/wtd.py": "d23044f4a1a0fed0d52bcf2f8249af7d003af7048bc63533741527b88215559c",
+    "denoising/__init__.py": "48808683a2259ac8eb3c7ad98d8e3df002c929b5716f57e9cd68f2ca27c664ef",
+    "denoising/f2p/config.json": "6528069d05f617461d9ef9e9256d1eba59ed812cf6d469f10cc0779c8e184b83",
+    "denoising/f2p/inference.py": "50e176ff7c3d03183ee33bf9ef832929ad3a40aa0f5f49887e6557675fb2cf99",
+    "denoising/f2p/model.py": "e58ae5565f00f86fd6ebb737d9678a59f7b263bb0bdcaf1f754c00d94dceffd0",
+    "denoising/f2p/__init__.py": "1143e41295fef4451cfc930eef5fa3407afc056894e7bd1d629719c8b56d4884"
+  }
+}

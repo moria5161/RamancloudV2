@@ -1,13 +1,13 @@
-import React from 'react';
-import Plot from 'react-plotly.js';
-import useChartLayout from '../hooks/useChartLayout';
+import { localize } from '../locale.js';
 import { usePreferences } from '../i18n';
+import React, { useEffect, useRef } from 'react';
+import Plot from './SizedPlot';
 
 const darkLayout = {
   paper_bgcolor: 'rgba(0,0,0,0)',
   plot_bgcolor: 'rgba(0,0,0,0)',
   modebar: {
-    bgcolor: 'rgba(0,0,0,0)',
+    bgcolor: 'rgba(255,255,255,0.42)',
     color: 'rgba(0,0,0,0.34)',
     activecolor: '#0071e3',
   },
@@ -42,9 +42,17 @@ export default function SpectralChart({
   cutRange,
   height = 500,
   showRaw = true,
+  showToolbar = true,
+  dark = false,
+  horizontalLegend = false,
+  rawLabel = 'Raw',
+  processedLabel = 'Processed',
+  spikePoints = [],
+  qualityPoints = [],
 }) {
-  const layout = useChartLayout(darkLayout, rawData);
-  const { t } = usePreferences();
+  usePreferences();
+  const textColor = dark ? 'rgba(255,255,255,0.72)' : darkLayout.font.color;
+  const gridColor = dark ? 'rgba(255,255,255,0.1)' : darkLayout.xaxis.gridcolor;
   const traces = [];
 
   if (rawData && showRaw) {
@@ -53,9 +61,9 @@ export default function SpectralChart({
       y: rawData.intensity,
       type: 'scatter',
       mode: 'lines',
-      name: t('raw'),
-      line: { color: '#8b95a5', width: 1.5 },
-      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('raw')}</extra>`,
+      name: rawLabel,
+      line: { color: processedData ? 'rgba(148,163,184,0.5)' : dark ? '#a5b7cd' : '#657c96', width: 1.5 },
+      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra></extra>',
     });
   }
 
@@ -65,9 +73,9 @@ export default function SpectralChart({
       y: processedData.intensity,
       type: 'scatter',
       mode: 'lines',
-      name: t('processed'),
+      name: processedLabel,
       line: { color: '#0071e3', width: 2.2 },
-      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('processed')}</extra>`,
+      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra></extra>',
     });
   }
 
@@ -77,22 +85,41 @@ export default function SpectralChart({
       y: baselineData,
       type: 'scatter',
       mode: 'lines',
-      name: t('baseline'),
+      name: 'Baseline',
       line: { color: '#30d158', width: 1.5, dash: 'dash' },
-      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${t('baseline')}</extra>`,
+      hovertemplate: '%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>Baseline</extra>',
     });
   }
 
+  for (const protectedPeak of [false, true]) {
+    const points = spikePoints.filter(point => protectedPeak ? point.repaired === false : point.repaired !== false);
+    if (!points.length) continue;
+    const label = protectedPeak ? localize("保留候选 / Preserved") : localize("已修复尖点 / Repaired impulses");
+    traces.push({ x: points.map(point => point.wavenumber), y: points.map(point => point.intensity),
+      type: 'scatter', mode: 'markers', name: label,
+      marker: { color: protectedPeak ? '#72869b' : '#dc6546', size: 8, symbol: 'circle-open', line: { width: 2 } },
+      hovertemplate: `%{x:.2f} cm⁻¹<br>%{y:.2f}<extra>${label}</extra>` });
+  }
+
+  if (qualityPoints.length) {
+    traces.push({ x: qualityPoints.map(point => point.wavenumber), y: qualityPoints.map(point => point.intensity),
+      text: qualityPoints.map(point => point.label || point.quality_code), type: 'scatter', mode: 'markers',
+      name: localize("质量候选 / Quality"), marker: { color: '#b56a12', size: 9, symbol: 'x' },
+      hovertemplate: '%{text}<br>%{x:.4f} cm⁻¹<br>%{y:.4g}<extra></extra>' });
+  }
+
+  // Cut range shaded area
   const shapes = [];
   if (cutRange && rawData) {
-    const minimum = Math.min(...rawData.wavenumber);
-    const maximum = Math.max(...rawData.wavenumber);
-    cutRange.forEach(boundary => {
-      if (boundary > minimum && boundary < maximum) shapes.push({
-        type: 'line', x0: boundary, x1: boundary,
-        y0: 0, y1: 1, yref: 'paper',
-        line: { width: 1, color: '#0071e3', dash: 'dot' },
-      });
+    shapes.push({
+      type: 'rect',
+      x0: cutRange[0],
+      x1: cutRange[1],
+      y0: 0,
+      y1: 1,
+      yref: 'paper',
+      fillcolor: 'rgba(129,140,248,0.05)',
+      line: { width: 1, color: 'rgba(129,140,248,0.2)', dash: 'dot' },
     });
   }
 
@@ -100,20 +127,33 @@ export default function SpectralChart({
     <Plot
       data={traces}
       layout={{
-        ...layout,
+        ...darkLayout,
+        font: { ...darkLayout.font, color: textColor },
+        legend: {
+          ...darkLayout.legend,
+          ...(horizontalLegend ? { orientation: 'h', x: 0, y: 1.03, xanchor: 'left', yanchor: 'bottom' } : {}),
+          bgcolor: dark ? 'rgba(21,25,36,0.85)' : darkLayout.legend.bgcolor,
+          font: { ...darkLayout.legend.font, color: textColor },
+        },
+        margin: horizontalLegend ? { l: 50, r: 16, t: 68, b: 50 } : darkLayout.margin,
+        modebar: { ...darkLayout.modebar, bgcolor: dark ? 'rgba(21,25,36,0.8)' : darkLayout.modebar.bgcolor, color: textColor },
         height,
         shapes,
         xaxis: {
-          ...layout.xaxis,
+          ...darkLayout.xaxis,
+          title: { ...darkLayout.xaxis.title, font: { size: 12, color: textColor } },
+          gridcolor: gridColor,
           autorange: true,
         },
         yaxis: {
-          ...layout.yaxis,
+          ...darkLayout.yaxis,
+          title: { ...darkLayout.yaxis.title, font: { size: 12, color: textColor } },
+          gridcolor: gridColor,
           autorange: true,
         },
       }}
       config={{
-        displayModeBar: true,
+        displayModeBar: showToolbar,
         modeBarButtonsToRemove: ['lasso2d', 'select2d', 'sendDataToCloud'],
         modeBarButtonsToAdd: ['resetScale2d'],
         displaylogo: false,
@@ -130,16 +170,15 @@ export default function SpectralChart({
  * Compare chart: raw vs processed in 2 subplots
  */
 export function CompareChart({ rawData, processedData, height = 700 }) {
-  const layout = useChartLayout(darkLayout, rawData);
-  const { t } = usePreferences();
+  usePreferences();
   const traces = [
     {
       x: rawData?.wavenumber || [],
       y: rawData?.intensity || [],
       type: 'scatter',
       mode: 'lines',
-      name: t('raw'),
-      line: { color: '#8b95a5', width: 1.5 },
+      name: 'Raw Spectrum',
+      line: { color: 'rgba(0,0,0,0.48)', width: 1.5 },
       xaxis: 'x',
       yaxis: 'y',
     },
@@ -148,7 +187,7 @@ export function CompareChart({ rawData, processedData, height = 700 }) {
       y: processedData?.intensity || [],
       type: 'scatter',
       mode: 'lines',
-      name: t('processed'),
+      name: 'Processed Spectrum',
       line: { color: '#0071e3', width: 2 },
       xaxis: 'x2',
       yaxis: 'y2',
@@ -159,14 +198,17 @@ export function CompareChart({ rawData, processedData, height = 700 }) {
     <Plot
       data={traces}
       layout={{
-        grid: { rows: 2, columns: 1, subplots: [['xy'], ['x2y2']], roworder: 'top to bottom' },
-        ...layout,
+        grid: { rows: 2, columns: 1, subplots: [['xy'], ['xy2']], roworder: 'top to bottom' },
+        ...darkLayout,
         height,
-        xaxis: { ...layout.xaxis, domain: [0, 1], anchor: 'y' },
-        margin: { l: 60, r: 30, t: 45, b: 50 },
-        yaxis: { ...layout.yaxis, title: { text: `${t('raw')} · ${t('intensity')}` }, domain: [0.58, 1], anchor: 'x' },
-        xaxis2: { ...layout.xaxis, domain: [0, 1], anchor: 'y2', matches: 'x' },
-        yaxis2: { ...layout.yaxis, title: { text: `${t('processed')} · ${t('intensity')}` }, domain: [0, 0.42], anchor: 'x2' },
+        xaxis: { ...darkLayout.xaxis, title: 'Wavenumber (cm⁻¹)', domain: [0, 1] },
+        yaxis: { ...darkLayout.yaxis, title: 'Intensity', domain: [0.52, 1] },
+        xaxis2: { ...darkLayout.xaxis, title: 'Wavenumber (cm⁻¹)', domain: [0, 1] },
+        yaxis2: { ...darkLayout.yaxis, title: 'Intensity', domain: [0, 0.43] },
+        annotations: [
+          { x: 0.5, y: 1, xref: 'paper', yref: 'paper', text: 'Raw Spectrum', showarrow: false, font: { size: 11, color: 'rgba(0,0,0,0.48)' } },
+          { x: 0.5, y: 0.48, xref: 'paper', yref: 'paper', text: 'Processed Spectrum', showarrow: false, font: { size: 11, color: '#0071e3' } },
+        ],
       }}
       config={{ displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true }}
       style={{ width: '100%', height: '100%' }}

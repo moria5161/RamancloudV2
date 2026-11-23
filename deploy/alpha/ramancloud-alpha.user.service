@@ -1,0 +1,17 @@
+[Unit]
+Description=RamanCloud alpha preview
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ramancloud-alpha/current/backend
+EnvironmentFile=%h/ramancloud-alpha/alpha.env
+Environment=PYTHONUNBUFFERED=1
+Environment=MPLBACKEND=Agg
+ExecStart=%h/ramancloud-alpha/current/.venv/bin/python -m uvicorn alpha_site:app --host 127.0.0.1 --port 5001 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

@@ -1,16 +1,19 @@
+import { systemText, localize } from '../locale.js';
+import { useQAExecutionInput } from '../components/qaExecution';
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
-import { Archive, ArrowRightLeft, Combine, Download, Scissors, Upload, Wrench } from 'lucide-react';
+import { Archive, ArrowRightLeft, Combine, Download, FileArchive, Scissors, Upload } from 'lucide-react';
 import { usePreferences } from '../i18n';
-import UploadSharingNotice from '../components/UploadSharingNotice';
-import { requestErrorDetail } from '../utils/requestError';
+import { SPECTRAL_ACCEPT } from '../components/ImportReport';
+import './ExtraTools.css';
 
-import { API_BASE } from '../utils/apiBase';
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const tools = [
   { id: 'split', labelKey: 'splitMapping', descKey: 'splitMappingDesc', icon: Scissors },
   { id: 'merge', labelKey: 'mergeSpectra', descKey: 'mergeSpectraDesc', icon: Combine },
   { id: 'convert', labelKey: 'formatConversion', descKey: 'conversion', icon: ArrowRightLeft },
+  { id: 'standardize', labelKey: 'standardizeSpectra', descKey: 'standardizeSpectraDesc', icon: FileArchive },
 ];
 
 function saveBlob(blob, filename) {
@@ -22,19 +25,28 @@ function saveBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function errorMessage(error) {
+  let data = error?.response?.data;
+  if (data instanceof Blob) {
+    try { data = JSON.parse(await data.text()); } catch { data = null; }
+  }
+  return typeof data?.detail === 'string' ? data.detail : localize("文件转换失败，请检查格式。");
+}
+
 export default function ExtraTools() {
   const { t } = usePreferences();
   const [mode, setMode] = useState('split');
-  const [instrument, setInstrument] = useState('Horiba');
+  const [instrument, setInstrument] = useState('auto');
   const [conversion, setConversion] = useState('horiba_to_nanophoton');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState('');
-  const [failed, setFailed] = useState(false);
   const inputRef = useRef(null);
 
+  useQAExecutionInput('extra-tools', { settings: { mode, instrument, conversion }, source_label: selectedFiles.map(f => f.name).join('、') }, selectedFiles, isRunning);
+
   const multiple = mode === 'merge';
-  const accept = mode === 'merge' ? '.txt,.asc,.csv' : '.txt';
+  const accept = ['split', 'standardize'].includes(mode) ? SPECTRAL_ACCEPT : mode === 'merge' ? '.txt,.asc,.csv' : '.txt';
 
   const resetFiles = () => {
     setSelectedFiles([]);
@@ -42,7 +54,6 @@ export default function ExtraTools() {
   };
 
   const handleMode = (nextMode) => {
-    if (isRunning) return;
     setMode(nextMode);
     setMessage('');
     resetFiles();
@@ -54,49 +65,50 @@ export default function ExtraTools() {
       return;
     }
     setIsRunning(true);
-    setFailed(false);
     setMessage('');
     try {
       const formData = new FormData();
-      formData.append('share_data', 'true');
       let endpoint = '';
       let filename = '';
 
       if (mode === 'split') {
         formData.append('file', selectedFiles[0]);
         formData.append('instrument', instrument);
-        endpoint = `${API_BASE}/tools/split`;
+        endpoint = `${API_BASE}/api/tools/split`;
         filename = 'split_files.zip';
       } else if (mode === 'merge') {
         selectedFiles.forEach((file) => formData.append('files', file));
-        endpoint = `${API_BASE}/tools/merge`;
+        endpoint = `${API_BASE}/api/tools/merge`;
         filename = 'merged_mapping.txt';
+      } else if (mode === 'standardize') {
+        formData.append('file', selectedFiles[0]);
+        endpoint = `${API_BASE}/api/tools/standardize`;
+        filename = 'standard_spectra.zip';
       } else {
         formData.append('file', selectedFiles[0]);
         formData.append('conversion', conversion);
-        endpoint = `${API_BASE}/tools/convert`;
+        endpoint = `${API_BASE}/api/tools/convert`;
         const stem = selectedFiles[0].name.replace(/\.[^.]+$/, '');
         filename = conversion === 'horiba_to_nanophoton' ? `${stem}_to_Nanophoton.txt` : `${stem}_to_Horiba.txt`;
       }
 
-      const { data, headers } = await axios.post(endpoint, formData, { responseType: 'blob', timeout: 600000 });
+      const { data } = await axios.post(endpoint, formData, { responseType: 'blob' });
       saveBlob(data, filename);
-      setMessage(headers['x-ramancloud-data-sharing'] === 'failed' ? `${t('toolDone')} ${t('archiveFailed')}` : t('toolDone'));
+      setMessage(t('toolDone'));
     } catch (error) {
-      const detail = await requestErrorDetail(error);
-      setFailed(true);
-      setMessage(`${t('requestFailed')}${detail ? ` ${detail}` : ''}`);
+      setMessage(await errorMessage(error));
     } finally {
       setIsRunning(false);
     }
   };
 
   return (
+    <div className="extra-tools-workspace" data-qa-state={JSON.stringify({ module: localize("附加工具"), mode, instrument, conversion, files: selectedFiles.map(f=>({name:f.name,size:f.size})), status:isRunning?'running':'draft', message })}>
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 space-y-8 animate-fade-in">
+      <div className="max-w-5xl mx-auto px-8 py-10 space-y-8 animate-fade-in">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <Wrench className="w-6 h-6 shrink-0 text-indigo-400" />
+            <FileArchive className="w-6 h-6 text-indigo-400" />
             <h1 className="text-2xl font-bold text-white">{t('extraTools')}</h1>
           </div>
           <p className="text-sm text-gray-400 max-w-2xl">
@@ -104,11 +116,10 @@ export default function ExtraTools() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="tool-grid grid grid-cols-2 xl:grid-cols-4 gap-4">
           {tools.map(({ id, labelKey, descKey, icon: Icon }) => (
             <button
               key={id}
-              disabled={isRunning}
               onClick={() => handleMode(id)}
               className={`liquid-card glass rounded-xl p-5 border text-left transition-all ${
                 mode === id ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 bg-white/5'
@@ -136,22 +147,24 @@ export default function ExtraTools() {
                 {mode === 'split' && t('splitMappingTitle')}
                 {mode === 'merge' && t('mergeSpectraTitle')}
                 {mode === 'convert' && t('conversionTitle')}
+                {mode === 'standardize' && t('standardizeSpectra')}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
                 {mode === 'split' && t('splitMappingHelp')}
                 {mode === 'merge' && t('mergeSpectraHelp')}
                 {mode === 'convert' && t('conversionHelp')}
+                {mode === 'standardize' && t('standardizeSpectraHelp')}
               </p>
             </div>
             <Archive className="w-5 h-5 text-indigo-400" />
           </div>
 
-          <UploadSharingNotice />
           <div className="flex flex-wrap items-center gap-4">
             {mode === 'split' && (
               <label className="space-y-1.5">
                 <span className="text-xs text-gray-500">{t('instrument')}</span>
-                <select disabled={isRunning} value={instrument} onChange={(e) => setInstrument(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
+                <select value={instrument} onChange={(e) => setInstrument(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
+                  <option value="auto">{t('autoDetect')}</option>
                   <option value="Horiba">Horiba</option>
                   <option value="Renishaw">Renishaw</option>
                   <option value="Nanophoton">Nanophoton</option>
@@ -162,15 +175,14 @@ export default function ExtraTools() {
             {mode === 'convert' && (
               <label className="space-y-1.5">
                 <span className="text-xs text-gray-500">{t('conversion')}</span>
-                <select disabled={isRunning} value={conversion} onChange={(e) => setConversion(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
-                  <option value="horiba_to_nanophoton">{t('horibaToNanophoton')}</option>
-                  <option value="nanophoton_to_horiba">{t('nanophotonToHoriba')}</option>
+                <select value={conversion} onChange={(e) => setConversion(e.target.value)} className="block px-3 py-2 rounded-lg border border-white/10 text-sm">
+                  <option value="horiba_to_nanophoton">Horiba to Nanophoton</option>
+                  <option value="nanophoton_to_horiba">Nanophoton to Horiba</option>
                 </select>
               </label>
             )}
 
             <button
-              disabled={isRunning}
               onClick={() => inputRef.current?.click()}
               className="liquid-button flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-gray-300 text-sm font-medium border border-white/5"
             >
@@ -181,7 +193,6 @@ export default function ExtraTools() {
             <input
               ref={inputRef}
               type="file"
-              disabled={isRunning}
               accept={accept}
               multiple={multiple}
               onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
@@ -207,24 +218,24 @@ export default function ExtraTools() {
           </div>
 
           {message && (
-            <div role={failed ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${failed ? 'border-red-500/20 text-red-400' : 'border-indigo-500/20 text-gray-400'}`}>
-              {message}
-              {failed && <button disabled={isRunning} onClick={runTool} className="ml-3 text-indigo-400 underline">{t('retry')}</button>}
+            <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-4 py-3 text-sm text-gray-400">
+              {systemText(message)}
             </div>
           )}
 
           <div className="flex items-center justify-end">
             <button
               onClick={runTool}
-              disabled={isRunning || !selectedFiles.length}
+              disabled={isRunning}
               className="liquid-button flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isRunning ? t('running') : t('runTool')}
+              {isRunning ? t('running') : mode === 'standardize' ? t('convertAndDownload') : t('runTool')}
               <Download className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

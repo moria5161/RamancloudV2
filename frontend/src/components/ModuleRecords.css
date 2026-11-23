@@ -1,0 +1,12 @@
+.module-upload-history { margin-top: 14px; }
+.module-upload-history label, .module-saved-results label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.module-upload-history select, .module-saved-results select, .module-saved-results input { min-width: 0; width: 100%; border: 1px solid var(--rc-hairline); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.module-saved-results { border: 1px solid var(--rc-hairline); border-radius: 12px; padding: 16px; margin-bottom: 20px; background: var(--rc-inset-bg); min-width: 0; }
+.module-saved-results form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; border-top: 1px solid var(--rc-hairline); margin-top: 17px; padding-top: 15px; }
+.module-saved-results form label { min-width: 0; flex: 1 1 180px; }
+.module-saved-results form > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--rc-hairline); border-radius: 8px; padding: 10px 13px; color: var(--rc-blue); font-size: 13px; background: var(--rc-surface-solid); }
+.module-save-success { display: flex; align-items: start; gap: 7px; margin: 15px 0 0; color: var(--rc-blue); font-size: 13px; overflow-wrap: anywhere; }
+.module-save-success svg { flex-shrink: 0; margin-top: 2px; }
+.module-record-pages { display: flex; gap: 12px; align-items: center; justify-content: end; margin-top: 10px; font-size: 12px; }
+.module-record-pages button { padding: 6px; color: var(--rc-blue); }
+.module-saved-results button:disabled { opacity: .45; cursor: not-allowed; }

@@ -1,9 +1,8 @@
-import React, { useId } from 'react';
+import { localize } from '../locale.js';
+import React from 'react';
 import StepController from './StepController';
-import UploadedSpectrumPicker from './UploadedSpectrumPicker';
-import { Play, Download, RotateCcw, Loader2, Zap, Trash2, X } from 'lucide-react';
+import { Play, Download, RotateCcw, Loader2, Zap } from 'lucide-react';
 import { usePreferences } from '../i18n';
-import { pipelineIssues } from '../utils/pipelineValidation';
 
 export default function ControlPanel({
   steps,
@@ -17,106 +16,86 @@ export default function ControlPanel({
   onDemoChange,
   demos,
   cutRange,
-  hasData,
-  busy = false,
-  hasResult = false,
-  isStale = false,
-  elapsed,
-  includeRecord,
-  onIncludeRecordChange,
-  onClear,
-  onFileRemove,
-  uploadedSpectra = [],
-  selectedSpectrum = 0,
-  onSpectrumChange,
-  onSpectrumRemove,
-  processAll = false,
-  onProcessAllChange,
-  allowBatch = false,
-  hasBaseline = false,
-  onDownloadBaseline,
-  hasBatchResult = false,
-  onBatchDownload,
-  batchStale = false,
-  wavenumber,
+  onCutRangeChange,
+  tshiContext,
+  downloadFormat = 'txt',
+  onDownloadFormatChange,
+  canDownload,
+  horizontal = false,
+  actionsOnly = false,
+  hideActions = false,
 }) {
-  const { t, language } = usePreferences();
-  const isZh = language === 'zh';
-  const sourceId = useId();
-  const spectrumId = useId();
-  const issues = pipelineIssues(steps, wavenumber, language);
+  const { t } = usePreferences();
 
   return (
-    <div className="h-full flex flex-col glass border-l border-white/5">
+    <fieldset disabled={isProcessing} className={horizontal ? `hyper-control-card ${actionsOnly ? 'hyper-actions-only' : ''}` : "h-full min-w-0 flex flex-col glass border-l border-white/5"}>
+      {!actionsOnly && <>
+      <details className="hyper-source-settings"><summary>{localize('数据来源与处理波段')}</summary>
       {/* Header */}
-      <div className="p-4 border-b border-white/5">
+      <div className="hyper-control-source p-4 border-b border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">{t('controls')}</h2>
+          <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">{horizontal ? t('pipelineSteps') : t('controls')}</h2>
         </div>
 
         {/* Data source */}
         <div className="space-y-2">
-          <label htmlFor={sourceId} className="text-xs text-gray-500 uppercase tracking-wider">{t('dataSource')}</label>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('dataSource')}</label>
           <select
-            id={sourceId}
-            disabled={busy}
             value={demoName || ''}
             onChange={e => onDemoChange(e.target.value)}
             className="w-full px-2.5 py-1.5 text-xs bg-black/30 border border-white/10 rounded-lg text-gray-200 focus:border-indigo-500/50 focus:outline-none"
           >
             <option value="">{t('uploadFileEllipsis')}</option>
             {demos.map(d => (
-              <option key={d} value={d}>{t(d === 'imaging_horiba' ? 'imagingDemo' : d === 'timeseries_horiba' ? 'timeSeriesDemo' : `${d}Demo`)}</option>
+              <option key={d} value={d}>{d === 'bacteria' ? 'Bacteria' : d === 'ulf' ? 'ULF Raman' : d === 'imaging_horiba' ? `Horiba · ${t('imaging')}` : d === 'timeseries_horiba' ? `Horiba · ${t('timeSeries')}` : 'Tutorial Raman'}</option>
             ))}
           </select>
           {fileName && (
-            <div className="flex items-center gap-2">
-              <p className="min-w-0 flex-1 text-[10px] text-gray-500 truncate" title={fileName}>{t('file')}: {fileName}</p>
-              {onFileRemove && <button type="button" onClick={onFileRemove} disabled={busy || !hasData}
-                title={`${t('removeFile')}: ${fileName}`} aria-label={`${t('removeFile')}: ${fileName}`}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                <X className="w-3.5 h-3.5" />
-              </button>}
-            </div>
+            <p className="text-[10px] text-gray-500 truncate">{t('file')}: {fileName}</p>
           )}
-          {uploadedSpectra.length > 0 && (
-            <div>
-              <label htmlFor={spectrumId} className="text-xs text-gray-500">{t('uploadedSpectrum')}</label>
-              <UploadedSpectrumPicker id={spectrumId} spectra={uploadedSpectra}
-                selected={selectedSpectrum} onChange={onSpectrumChange}
-                onRemove={onSpectrumRemove} busy={busy} />
-            </div>
-          )}
-          {uploadedSpectra.length > 1 && <label className="flex items-center gap-2 text-xs text-gray-500">
-            <input type="checkbox" checked={processAll} disabled={busy} onChange={event => onProcessAllChange(event.target.checked)} />
-            {isZh ? `对全部 ${uploadedSpectra.length} 条光谱应用流程` : `Apply pipeline to all ${uploadedSpectra.length} spectra`}
-          </label>}
         </div>
 
+        {/* Quick cut range */}
+        <div className="mt-3 space-y-1.5">
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">{t('quickCutRange')}</label>
+          <div className="flex gap-1.5">
+            <input
+              type="number"
+              placeholder={t('min')}
+              value={cutRange?.[0] || ''}
+              onChange={e => onCutRangeChange?.([parseFloat(e.target.value) || 0, cutRange?.[1] || 4000])}
+              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
+            />
+            <input
+              type="number"
+              placeholder={t('max')}
+              value={cutRange?.[1] || ''}
+              onChange={e => onCutRangeChange?.([cutRange?.[0] || 0, parseFloat(e.target.value) || 4000])}
+              className="w-full px-2 py-1 text-xs bg-black/30 border border-white/10 rounded text-gray-200 focus:border-indigo-500/50 focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
+      </details>
       {/* Pipeline steps */}
-      <fieldset disabled={busy} className="flex-1 overflow-y-auto p-4 min-h-0">
-        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} allowBatch={allowBatch || processAll} issues={issues} />
-      </fieldset>
+      <div className="hyper-control-steps flex-1 overflow-y-auto p-4">
+        <StepController steps={steps} onChange={onStepsChange} defaultCutRange={cutRange} tshiContext={tshiContext} horizontal={horizontal} />
+      </div>
 
+      </>}
       {/* Action buttons */}
-      <div className="p-4 border-t border-white/5 space-y-2">
-        <div role="status" className={`text-xs ${isStale ? 'text-amber-600' : 'text-gray-500'}`}>
-          {hasResult && (isStale ? t('resultStale') : `${t('processingComplete')} · ${elapsed?.toFixed(2)} s`)}
-        </div>
-        {hasBaseline && <button onClick={onDownloadBaseline} disabled={busy || isStale}
-          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-white/5 text-xs text-gray-400">
-          <Download className="w-3.5 h-3.5" />{isZh ? '下载独立基线' : 'Download baseline'}
-        </button>}
-        {hasBatchResult && <button onClick={onBatchDownload} disabled={busy || batchStale}
-          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-white/5 text-xs text-gray-400">
-          <Download className="w-3.5 h-3.5" />{isZh ? '下载批量结果' : 'Download batch results'}
-        </button>}
+      {!hideActions && (
+      <div className="hyper-control-actions p-4 border-t border-white/5 space-y-2">
+        {tshiContext?.isImaging && <label className="tshi-export"><span>{localize("结果格式")}</span>
+          <select value={downloadFormat} onChange={e => onDownloadFormatChange(e.target.value)}>
+            <option value="mat">{localize("MAT（含尺寸与诊断）")}</option><option value="txt">{localize("TXT（光谱矩阵）")}</option>
+          </select>
+        </label>}
         <button
           onClick={onProcess}
-          disabled={busy || !hasData || steps.length === 0 || Object.keys(issues).length > 0}
+          disabled={isProcessing || (!fileName && !demoName)}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
         >
           {isProcessing ? (
@@ -127,16 +106,10 @@ export default function ControlPanel({
           {isProcessing ? t('processing') : t('runPipeline')}
         </button>
 
-        <label className="flex items-center gap-2 text-xs text-gray-500">
-          <input type="checkbox" checked={includeRecord} onChange={e => onIncludeRecordChange(e.target.checked)} disabled={busy} />
-          {t('includeRecord')}
-        </label>
-
         <div className="flex gap-2">
           <button
             onClick={onDownload}
-            disabled={busy || !hasResult || isStale}
-            title={isStale ? t('resultStale') : t('download')}
+            disabled={!canDownload}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-all"
           >
             <Download className="w-3 h-3" />
@@ -144,17 +117,13 @@ export default function ControlPanel({
           </button>
           <button
             onClick={onReset}
-            disabled={busy || !hasData}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 text-xs font-medium transition-all"
           >
             <RotateCcw className="w-3 h-3" />
             {t('reset')}
           </button>
         </div>
-        <button onClick={onClear} disabled={busy || !hasData} className="flex items-center justify-center gap-2 w-full py-2 text-xs text-gray-500" title={t('clearWorkspace')}>
-          <Trash2 className="w-3.5 h-3.5" />{t('clearWorkspace')}
-        </button>
-      </div>
-    </div>
+      </div>)}
+    </fieldset>
   );
 }

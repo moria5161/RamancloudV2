@@ -1,0 +1,5 @@
+.extra-tools-workspace { height: 100%; min-width: 0; }
+@media (max-width: 760px) {
+  .extra-tools-workspace > :first-child > :first-child { padding: 18px 14px; }
+  .extra-tools-workspace .tool-grid { grid-template-columns: 1fr; }
+}

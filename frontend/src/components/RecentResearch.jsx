@@ -1,71 +1,40 @@
 import React, { useRef, useState } from 'react';
-import { ArrowUpRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, BookOpen } from 'lucide-react';
 import { usePreferences } from '../i18n';
-import { researchCategories } from '../data/research';
+import { researchCategories } from '../content/research';
+import './RecentResearch.css';
+
+const LABELS = {
+  structure: ['结构解析', 'Structure elucidation'],
+  denoising: ['降噪与分辨率提升', 'Denoising & resolution'],
+  classification: ['光谱分类', 'Spectral classification'],
+};
 
 export default function RecentResearch() {
-  const { language, t } = usePreferences();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [expandedCategories, setExpandedCategories] = useState({});
+  const { language } = usePreferences();
+  const txt = (zh, en) => language === 'zh' ? zh : en;
+  const [index, setIndex] = useState(0), [expanded, setExpanded] = useState(false);
   const tabs = useRef([]);
-  const category = researchCategories[activeIndex];
-  const expanded = Boolean(expandedCategories[category.id]);
-  const visiblePapers = expanded ? category.papers : category.papers.slice(0, 6);
-
-  const navigateTabs = (event, index) => {
+  const category = researchCategories[index];
+  function choose(next) { setIndex(next); setExpanded(false); }
+  function navigate(event, current) {
     let next;
-    if (event.key === 'ArrowRight') next = (index + 1) % researchCategories.length;
-    else if (event.key === 'ArrowLeft') next = (index + researchCategories.length - 1) % researchCategories.length;
+    if (event.key === 'ArrowRight') next = (current + 1) % researchCategories.length;
+    else if (event.key === 'ArrowLeft') next = (current + researchCategories.length - 1) % researchCategories.length;
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = researchCategories.length - 1;
     else return;
-    event.preventDefault();
-    setActiveIndex(next);
-    tabs.current[next]?.focus();
-  };
-
-  return (
-    <section className="space-y-5" aria-labelledby="recent-research-heading">
-      <h2 id="recent-research-heading" className="text-lg font-semibold text-gray-200">{t('recentResearch')}</h2>
-      <div role="tablist" aria-label={t('recentResearch')} className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
-        {researchCategories.map((item, index) => <button
-          key={item.id} id={`research-tab-${item.id}`} role="tab" aria-selected={activeIndex === index}
-          aria-controls="research-panel" tabIndex={activeIndex === index ? 0 : -1}
-          ref={element => { tabs.current[index] = element; }}
-          onClick={() => setActiveIndex(index)} onKeyDown={event => navigateTabs(event, index)}
-          className={`px-3 py-2 text-xs rounded-md transition-colors ${activeIndex === index ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
-          {t(item.labelKey)}
-        </button>)}
-      </div>
-      <div id="research-panel" role="tabpanel" aria-labelledby={`research-tab-${category.id}`} tabIndex={0}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {visiblePapers.map(paper => <article key={paper.url} className="glass rounded-lg border border-white/5 flex flex-col min-w-0">
-          {paper.image && <div className="aspect-[4/3] bg-white/90 p-4">
-            <img src={`${import.meta.env.BASE_URL}research/${paper.image}`} alt={language === 'zh' ? paper.titleZh : paper.title}
-              loading="lazy" decoding="async" className="w-full h-full object-contain" />
-          </div>}
-          <div className="p-5 flex flex-col gap-3 flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-gray-200 leading-relaxed break-words">
-              <a href={paper.url} target="_blank" rel="noopener noreferrer" title={paper.title} className="hover:text-indigo-400 transition-colors">
-                {language === 'zh' ? paper.titleZh : paper.title}
-              </a>
-            </h3>
-            <p className="text-xs text-gray-500">{paper.citation}</p>
-            <a href={paper.url} target="_blank" rel="noopener noreferrer"
-              className="mt-auto inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 self-start">
-              {t('readPublication')}<ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </article>)}
-      </div>
-      {category.papers.length > 6 && <div className="flex justify-center">
-        <button type="button" aria-expanded={expanded} aria-controls="research-panel"
-          onClick={() => setExpandedCategories(previous => ({ ...previous, [category.id]: !expanded }))}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm text-gray-400 hover:text-indigo-400 hover:bg-white/5 transition-colors">
-          {t(expanded ? 'showFewerPublications' : 'showMorePublications')}
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-      </div>}
-    </section>
-  );
+    event.preventDefault(); choose(next); tabs.current[next]?.focus();
+  }
+  return <section className="research-section" aria-labelledby="recent-research-heading">
+    <div className="learning-section-heading"><div><p className="learning-eyebrow"><BookOpen size={15} />{txt('研究与方法', 'Research & methods')}</p><h2 id="recent-research-heading">{txt('课题组研究进展', 'Research from our group')}</h2></div><a className="learning-text-link" href="https://github.com/moria5161/RamancloudV2/blob/main/frontend/src/data/research.js" target="_blank" rel="noopener noreferrer">{txt('原始 V2 论文列表', 'Original V2 collection')}<ArrowUpRight size={14} /></a></div>
+    <div className="research-tabs" role="tablist" aria-label={txt('论文研究方向', 'Research topics')}>{researchCategories.map((item, i) => <button key={item.id} type="button" role="tab" id={`research-tab-${item.id}`} aria-selected={index === i} aria-controls="research-panel" tabIndex={index === i ? 0 : -1} ref={node => { tabs.current[i] = node; }} onClick={() => choose(i)} onKeyDown={event => navigate(event, i)}>{txt(...LABELS[item.id])}<span>{item.papers.length}</span></button>)}</div>
+    <div className="research-grid" id="research-panel" role="tabpanel" tabIndex={0} aria-labelledby={`research-tab-${category.id}`}>
+      {(expanded ? category.papers : category.papers.slice(0, 4)).map(paper => <article key={paper.url} className="research-card">
+        <div className="research-illustration"><img src={`${import.meta.env.BASE_URL}research/${paper.image}`} alt={txt(paper.titleZh, paper.title)} loading="lazy" decoding="async" /></div>
+        <div className="research-card-content"><h3><a href={paper.url} target="_blank" rel="noopener noreferrer">{txt(paper.titleZh, paper.title)}</a></h3>{language === 'zh' && <p className="research-original-title">{paper.title}</p>}<p className="research-citation">{paper.citation}</p><a className="learning-text-link" href={paper.url} target="_blank" rel="noopener noreferrer">{txt('阅读原文', 'Read publication')}<ArrowUpRight size={14} /></a></div>
+      </article>)}
+    </div>
+    {category.papers.length > 4 && <button type="button" className="learning-button research-more" aria-expanded={expanded} aria-controls="research-panel" onClick={() => setExpanded(!expanded)}>{expanded ? txt('收起', 'Show fewer') : txt(`查看本类全部 ${category.papers.length} 篇`, `View all ${category.papers.length} papers`)}<ArrowDown size={14} style={expanded ? { transform: 'rotate(180deg)' } : undefined} /></button>}
+  </section>;
 }

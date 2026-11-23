@@ -1,0 +1,10 @@
+.import-report { font-size: 11px; line-height: 1.7; color: var(--rc-secondary); border-bottom: 1px solid var(--rc-border); padding: 8px 0; overflow-wrap: anywhere; }
+.import-report > div:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.import-report strong { color: var(--rc-text); font-weight: 600; }
+.import-report ul { margin-top: 5px; padding-left: 16px; list-style: disc; }
+.import-conversion-status { margin: 12px 0 8px; color: var(--rc-text); }
+.import-report > .ai-actions { margin: 8px 0; }
+.import-file-details { margin-top: 8px; }
+.import-file-details summary { cursor: pointer; }
+.import-file-details > div { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+.import-file-details code { display: block; margin-top: 6px; overflow-wrap: anywhere; }

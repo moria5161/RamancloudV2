@@ -1,37 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { systemText } from '../locale.js';
+import React, { useState } from 'react';
 import { Check, Languages, Moon, Settings, Sun } from 'lucide-react';
 import { usePreferences } from '../i18n';
-import UploadSharingNotice from './UploadSharingNotice';
 
 export default function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const { language, setLanguage, theme, setTheme, t } = usePreferences();
-  const dockRef = useRef(null);
-  const triggerRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const dismissOutside = event => {
-      if (!dockRef.current?.contains(event.target)) setOpen(false);
-    };
-    const dismissOnEscape = event => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('pointerdown', dismissOutside, true);
-    document.addEventListener('keydown', dismissOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', dismissOutside, true);
-      document.removeEventListener('keydown', dismissOnEscape);
-    };
-  }, [open]);
+  const { language, setLanguage, languageError, retryLanguage, theme, setTheme, t } = usePreferences();
 
   return (
-    <div ref={dockRef} className="settings-dock">
+    <div className="settings-dock">
       {open && (
-        <div id="settings-popover" className="settings-popover glass rounded-xl border border-white/5 p-4">
+        <div className="settings-popover glass rounded-xl border border-white/5 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-200 mb-4">
             <Settings className="w-4 h-4 text-indigo-400" />
             {t('settings')}
@@ -42,13 +21,14 @@ export default function SettingsPanel() {
                 <Languages className="w-3.5 h-3.5" />
                 {t('language')}
               </div>
+              {languageError && <p role="alert" className="text-xs mt-2">{language === 'zh' ? '语言偏好同步失败。' : 'Unable to sync language preference.'} <button onClick={retryLanguage}>{language === 'zh' ? '重试' : 'Retry'}</button></p>}
               <div className="segmented-control">
                 {[
                   ['en', t('english')],
                   ['zh', t('chinese')],
                 ].map(([value, label]) => (
                   <button key={value} onClick={() => setLanguage(value)} className={language === value ? 'is-active' : ''}>
-                    {label}
+                    {systemText(label)}
                     {language === value && <Check className="w-3 h-3" />}
                   </button>
                 ))}
@@ -66,18 +46,15 @@ export default function SettingsPanel() {
                 ].map(([value, label, Icon]) => (
                   <button key={value} onClick={() => setTheme(value)} className={theme === value ? 'is-active' : ''}>
                     <Icon className="w-3.5 h-3.5" />
-                    {label}
+                    {systemText(label)}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="border-t border-white/10 pt-3">
-              <UploadSharingNotice onOpenPolicy={() => setOpen(false)} />
-            </div>
           </div>
         </div>
       )}
-      <button ref={triggerRef} className="settings-trigger glass" onClick={() => setOpen((value) => !value)} aria-label={t('settings')} aria-expanded={open} aria-controls="settings-popover">
+      <button className="settings-trigger glass" onClick={() => setOpen((value) => !value)} aria-label={`${t('settings')} / Language`}>
         <Settings className="w-4 h-4" />
       </button>
     </div>

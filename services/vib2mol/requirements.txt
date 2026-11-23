@@ -1,0 +1,8 @@
+# Install PyTorch separately using the CPU/CUDA command in STRUCTURE_GENERATION.md.
+numpy==1.26.4
+transformers==4.44.2
+rdkit==2025.3.5
+scikit-learn==1.5.2
+tqdm==4.67.1
+pandas==2.2.3
+lmdb==1.6.2

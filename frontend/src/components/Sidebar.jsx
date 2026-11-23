@@ -1,78 +1,68 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { systemText } from '../locale.js';
+import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Activity, Layers, Atom, BookOpen, Users, Github, Wrench, ShieldCheck, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Home, Database, Atom, GitBranch, Layers, LineChart, BookOpen, Users, Github, Wrench, UserCircle, LogOut, FolderKanban, History, Sparkles, MessageSquare } from 'lucide-react';
 import CloudLogo from './CloudLogo';
+import { useAuth } from '../auth';
 import { usePreferences } from '../i18n';
 
 const navItems = [
   { to: '/', icon: Home, labelKey: 'homepage' },
-  { to: '/spectral', icon: Activity, labelKey: 'spectralProcessing' },
+  { to: '/ai-analysis', icon: Sparkles, labelKey: 'aiAnalysis' },
   { to: '/hyperspectral', icon: Layers, labelKey: 'hyperspectralProcessing' },
-  { to: '/spectrum-structure', icon: Atom, labelKey: 'spectrumStructure' },
+  { to: '/peak-fitting', icon: LineChart, labelKey: 'peakFitting' },
+  { to: '/spectral-unmixing', icon: GitBranch, labelKey: 'spectralUnmixing' },
+  { to: '/library-matching', icon: Database, labelKey: 'libraryMatching' },
+  { to: '/structure-generation', icon: Atom, labelKey: 'structureGeneration' },
+  { to: '/projects', icon: FolderKanban, labelKey: 'projectDataManagement' },
+  { to: '/analysis-history', icon: History, labelKey: 'analysisHistory' },
   { to: '/extra-tools', icon: Wrench, labelKey: 'extraTools' },
+  { to: '/account', icon: UserCircle, labelKey: 'personalSpace' },
   { to: '/tutorial', icon: BookOpen, labelKey: 'tutorial' },
+  { to: '/feedback', icon: MessageSquare, labelKey: 'feedback' },
   { to: '/contributors', icon: Users, labelKey: 'contributors' },
-  { to: '/privacy-policy', icon: ShieldCheck, labelKey: 'privacyPolicy' },
 ];
 
-export default function Sidebar({ layout }) {
+export default function Sidebar() {
   const location = useLocation();
+  const { user, logout } = useAuth();
   const { t } = usePreferences();
-  const drag = useRef(null);
-  const [resizing, setResizing] = useState(false);
-  const { width, collapsed, narrow, overlay, minWidth, maxWidth, toggle, resize, resetWidth, closeMobile } = layout;
-
-  useEffect(() => {
-    if (!overlay) return;
-    const escape = event => { if (event.key === 'Escape') closeMobile(); };
-    document.addEventListener('keydown', escape);
-    return () => document.removeEventListener('keydown', escape);
-  }, [overlay, closeMobile]);
-
-  const stopResize = event => {
-    drag.current = null;
-    setResizing(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  };
 
   return (
-    <aside className={`sidebar-glass glass flex flex-col border-r border-white/5 shrink-0 z-10 ${collapsed ? 'is-collapsed' : ''} ${resizing ? 'is-resizing' : ''}`}>
-      <div className="sidebar-scroll flex-1 min-h-0 overflow-y-auto">
+    <aside className="sidebar-glass w-60 glass flex flex-col justify-between border-r border-white/5 shrink-0 z-10">
+      <div className="min-h-0 flex-1 flex flex-col">
         {/* Logo */}
-        <div className="sidebar-brand p-4 border-b border-white/5">
-          <div className="sidebar-brand-row flex items-center gap-2">
-            <div className="sidebar-logo w-9 h-9 shrink-0 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <CloudLogo className="w-9 h-9" />
+        <div className="p-5 border-b border-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="sidebar-logo w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <CloudLogo className="w-7 h-7" />
             </div>
-            <div className="sidebar-label min-w-0 flex-1">
-              <h1 className="text-lg font-bold text-white truncate" title="RamanCloud">RamanCloud</h1>
-              <p className="text-[10px] text-gray-500 -mt-0.5 truncate">{t('nextGen')}</p>
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-tight">RamanCloud</h1>
+              <p className="text-[10px] text-gray-500 -mt-0.5">{t('nextGen')}</p>
             </div>
-            <button type="button" className="sidebar-toggle shrink-0" onClick={toggle} title={t(collapsed ? 'openNavigation' : 'closeNavigation')} aria-label={t(collapsed ? 'openNavigation' : 'closeNavigation')} aria-expanded={!collapsed} aria-controls="main-navigation">
-              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-            </button>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav id="main-navigation" aria-label={t('navigation')} className="p-3 space-y-1">
+        <nav className="p-3 space-y-1 min-h-0 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, labelKey }) => {
             const isActive = location.pathname === to;
+            const label = t(labelKey === 'feedback' && user?.role === 'admin' ? 'feedbackManagement' : labelKey);
             return (
               <NavLink
                 key={to}
                 to={to}
-                title={t(labelKey)}
-                aria-label={t(labelKey)}
-                onClick={closeMobile}
-                className={`nav-liquid flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border ${
+                title={systemText(label)}
+                aria-label={systemText(label)}
+                className={`nav-liquid flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                 }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-400' : ''}`} />
-                <span className="sidebar-label min-w-0 break-words">{t(labelKey)}</span>
+                <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : ''}`} />
+                <span className="sidebar-nav-label">{systemText(label)}</span>
               </NavLink>
             );
           })}
@@ -80,47 +70,43 @@ export default function Sidebar({ layout }) {
       </div>
 
       {/* Footer */}
-      <div className="sidebar-footer shrink-0 border-t border-white/5">
+      <div className="p-4 border-t border-white/5 space-y-3 shrink-0">
+        <div className="sidebar-account rounded-xl border border-white/5 p-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <UserCircle className="w-4 h-4 shrink-0 text-indigo-400" />
+            <div className="min-w-0">
+              <div className="truncate text-xs font-medium text-gray-200">{user?.display_name || user?.username}</div>
+              <div className="truncate text-[10px] text-gray-500">@{user?.username}</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            title={t('logout')}
+            aria-label={t('logout')}
+            onClick={logout}
+            className="sidebar-account-action mt-3 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {t('logout')}
+          </button>
+          <NavLink to="/login" title={t('switchAccount')} aria-label={t('switchAccount')} className="sidebar-account-action mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs">
+            <UserCircle className="w-4 h-4 shrink-0" />
+            <span className="sidebar-nav-label">{t('switchAccount')}</span>
+          </NavLink>
+        </div>
         <a
-          href="https://github.com/moria5161/RamancloudV2"
+          href="https://github.com/hzh040518/Ramancloud"
           target="_blank"
           rel="noopener noreferrer"
-          title="GitHub" aria-label="GitHub"
           className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
         >
-          <Github className="w-3.5 h-3.5 shrink-0" />
-          <span className="sidebar-label">GitHub</span>
+          <Github className="w-3.5 h-3.5" />
+          <span>GitHub</span>
         </a>
-        <p className="sidebar-label text-[10px] text-gray-600 mt-2">
+        <p className="text-[10px] text-gray-600 mt-2">
           Ren Research Group, XMU
         </p>
       </div>
-      {!collapsed && !narrow && <div
-        className="sidebar-resize-handle"
-        role="separator" tabIndex={0} aria-orientation="vertical" aria-label={t('resizeNavigation')}
-        aria-controls="main-navigation" aria-valuemin={minWidth} aria-valuemax={maxWidth} aria-valuenow={width}
-        title={t('resizeNavigation')}
-        onDoubleClick={resetWidth}
-        onPointerDown={event => {
-          if (event.button !== 0) return;
-          event.preventDefault();
-          event.currentTarget.focus();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { startX: event.clientX, width };
-          setResizing(true);
-        }}
-        onPointerMove={event => {
-          if (drag.current) resize(drag.current.width + event.clientX - drag.current.startX);
-        }}
-        onPointerUp={stopResize}
-        onPointerCancel={stopResize}
-        onLostPointerCapture={() => { drag.current = null; setResizing(false); }}
-        onKeyDown={event => {
-          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-          event.preventDefault();
-          resize(event.key === 'Home' ? minWidth : event.key === 'End' ? maxWidth : width + (event.key === 'ArrowRight' ? 16 : -16));
-        }}
-      />}
     </aside>
   );
 }

@@ -1,0 +1,12 @@
+.qa-plan-card{margin:14px 0;padding:13px;border:1px solid #3b82f688;border-radius:12px;background:#3b82f606;overflow-wrap:anywhere}
+.qa-plan-parameters{margin:10px 0;border-top:1px solid #94a3b844;padding-top:10px}
+.qa-plan-parameters h4{font-size:13px;font-weight:650;margin:0}
+.qa-plan-parameters .qa-plan-fields{padding:3px 0 0}
+.qa-panel .qa-plan-run:disabled,.qa-panel .qa-create-plan:disabled{background:#e2e8f0;color:#64748b;cursor:not-allowed;opacity:.75}
+.qa-plan-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qa-plan-methods{display:block;color:var(--text-secondary,#64748b);font-size:11px;line-height:1.5;margin-top:3px}
+.qa-plan-readiness{display:block;color:var(--text-secondary,#64748b);font-size:11px;line-height:1.5;margin:5px 0}
+.qa-plan-heading{display:flex;justify-content:space-between;gap:8px;align-items:start}.qa-plan-heading strong{font-size:14px}.qa-plan-heading span{font-size:11px;white-space:nowrap;color:#3b82f6}
+.qa-plan-card>p{font-size:12px;line-height:1.7;margin:9px 0}.qa-plan-stages{list-style:decimal;padding-left:22px;margin:12px 0;font-size:13px}.qa-plan-stages li{padding:5px 0}.qa-plan-card details{margin:9px 0;font-size:12px}.qa-plan-card summary{cursor:pointer;color:#2563eb;padding:5px 0}
+.qa-plan-fields{padding:8px 0}.qa-plan-fields>strong{display:block;margin:5px 0}.qa-plan-fields label{display:block;font-size:11px;margin:7px 0}.qa-plan-fields input:not([type=checkbox]),.qa-plan-fields select{display:block;width:100%;box-sizing:border-box;background:var(--bg-primary,#fff);color:inherit;padding:6px;border:1px solid #94a3b866;border-radius:6px;margin-top:4px}.qa-plan-card .qa-plan-check{display:flex;align-items:start;gap:6px;font-size:11px;line-height:1.6;margin:9px 0}.qa-plan-check input{margin-top:3px;flex-shrink:0;accent-color:#2563eb}.qa-plan-algorithm{padding:7px;border:1px solid #94a3b833;border-radius:7px;margin:6px 0}
+.qa-panel .qa-plan-run{display:block;width:100%;background:#2563eb;border:0;color:white;margin-top:10px;padding:10px}.qa-panel .qa-plan-revise{display:block;margin-top:7px;font-size:11px;border:0;color:#2563eb;padding:4px 0}.qa-plan-result{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:10px}.qa-plan-result button{font-size:11px}.qa-tools .qa-create-plan{margin-left:auto}.qa-plan-card>small{margin:7px 0}

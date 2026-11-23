@@ -1,0 +1,81 @@
+{
+  "repository": "https://github.com/moria5161/RamancloudV2",
+  "commit": "249b1bb0894f48413621ae51e08a49d9cc7a3891",
+  "files": [
+    {
+      "file": "vib2mol-toc.png",
+      "bytes": 472214,
+      "sha256": "42b84906a46717024f85e24d8c0223060d43a3d8da3fe1f894e0699c7ecb0c29"
+    },
+    {
+      "file": "vib2conf-toc.png",
+      "bytes": 269336,
+      "sha256": "dd973d42a7ceffd7c3919c6702af76eb1df28255319b9d545be939e2b2b0f7b1"
+    },
+    {
+      "file": "spec_str2.jpeg",
+      "bytes": 163617,
+      "sha256": "e4946424ce7c37cb46f9c0f549106c86879334bcadcb25633919d231218104a7"
+    },
+    {
+      "file": "spec_str1.png",
+      "bytes": 767940,
+      "sha256": "8ff0c8d7c2f14b74e8585f41f93a2cd82749f2b54edb5a4e38bb9e25313bd40d"
+    },
+    {
+      "file": "deno_sr6.jpeg",
+      "bytes": 91611,
+      "sha256": "ee7f143b95bd365c6de3c0f505c96ac73721127d4e359b2e4351182e386aa06c"
+    },
+    {
+      "file": "deno_sr5.jpeg",
+      "bytes": 128643,
+      "sha256": "162430f36d9b4ba0e319e4b9c5cda37d7462d4c10e55dffbcd9b880719ec3ee1"
+    },
+    {
+      "file": "deno_sr4.jpeg",
+      "bytes": 407413,
+      "sha256": "34edf107dec78ed830e98067bfa538cca3aec16c09a870930c8fa16e2a911768"
+    },
+    {
+      "file": "deno_sr3.jpeg",
+      "bytes": 180122,
+      "sha256": "561a69d0ded77126cc7b35923516ab303f0aad87d20b687bc47c7e9031b4719e"
+    },
+    {
+      "file": "deno_sr2.jpeg",
+      "bytes": 158612,
+      "sha256": "60c0c8e775f8ababa926fa84781448ab1a6bc9f2864d97cb1b2c4ccb095a3d12"
+    },
+    {
+      "file": "review1.gif",
+      "bytes": 70626,
+      "sha256": "0281e88bf7d3bf5b67a65d05ba026a83e6ba5be297e223c59201e413557823f6"
+    },
+    {
+      "file": "deno_sr1.jpeg",
+      "bytes": 172017,
+      "sha256": "ebc4a1f61f9fce38fbef022942edbed3d57d59da86600d6ac223cfc987004854"
+    },
+    {
+      "file": "spec_cls4.jpeg",
+      "bytes": 74231,
+      "sha256": "cc99351caabbe95afe0eab3c0f745d8e1eba172bb813bdcad69a236b1b74af59"
+    },
+    {
+      "file": "spec_cls3.jpeg",
+      "bytes": 117327,
+      "sha256": "8650831df9438aff3af620082725ed3499911308bbcf5669d7eb668dd4114beb"
+    },
+    {
+      "file": "spec_cls2.jpeg",
+      "bytes": 135774,
+      "sha256": "d33541309bb5450239bc2e0a7607b68211c178ed7b41aeead16877a4bfdf44e7"
+    },
+    {
+      "file": "spec_cls1.jpeg",
+      "bytes": 161420,
+      "sha256": "3856571cefca97dfb7beeda894e30f29a2fddf6e30fd0091fe6824eefaf28c3f"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+[Unit]
+Description=RamanCloud alpha
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=ramancloud-alpha
+Group=ramancloud-alpha
+WorkingDirectory=/srv/ramancloud-alpha/current/backend
+EnvironmentFile=/etc/ramancloud-alpha.env
+Environment=PYTHONUNBUFFERED=1
+Environment=MPLBACKEND=Agg
+ExecStart=/srv/ramancloud-alpha/current/.venv/bin/python -m uvicorn alpha_site:app --host 127.0.0.1 --port 5001 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=3
+StateDirectory=ramancloud-alpha
+StateDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

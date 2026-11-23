@@ -1,0 +1,25 @@
+.project-collaboration { color: var(--rc-text); padding: 18px 0; border-top: 1px solid var(--rc-hairline); border-bottom: 1px solid var(--rc-hairline); font-size: 13px; }
+.invitation-inbox { margin: 0 0 18px; }
+.collab-heading, .collab-actions, .collab-invitation { display: flex; align-items: center; gap: 10px; }
+.collab-heading { flex-wrap: wrap; margin-bottom: 12px; }
+.collab-heading h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; margin-right: auto; }
+.project-collaboration button, .project-collaboration a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--rc-hairline); border-radius: 4px; color: var(--rc-text); background: var(--rc-surface-solid); font-size: 12px; cursor: pointer; }
+.project-collaboration .collab-icon { width: 34px; height: 34px; padding: 0; flex-shrink: 0; }
+.project-collaboration button:disabled { opacity: .45; cursor: default; }
+.collab-muted, .collab-invitation p, .collab-table small { color: var(--rc-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.collab-error { color: #c14444; margin: 8px 0; overflow-wrap: anywhere; }
+.collab-tabs { display: flex; gap: 5px; margin-bottom: 16px; }
+.collab-tabs [aria-selected="true"] { border-color: #087e8b; color: #087e8b; }
+.collab-invite-form { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 10px; align-items: end; margin-bottom: 12px; }
+.collab-invite-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.project-collaboration input, .project-collaboration select { min-width: 0; width: 100%; padding: 7px; min-height: 34px; border: 1px solid var(--rc-hairline); border-radius: 4px; background: var(--rc-surface-solid); color: var(--rc-text); font-size: 12px; }
+.collab-table { width: 100%; overflow-x: auto; }
+.collab-table table { width: 100%; min-width: 460px; border-collapse: collapse; text-align: left; }
+.collab-table td, .collab-table th { padding: 10px 8px; border-bottom: 1px solid var(--rc-hairline); }
+.collab-table th { color: var(--rc-secondary); font-weight: 500; }
+.collab-invitation { justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--rc-hairline); overflow-wrap: anywhere; }
+.collab-invitation > div:first-child { min-width: 0; }
+.collab-events { list-style: none; padding: 0; margin: 0; max-height: 340px; overflow: auto; }
+.collab-events li { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--rc-hairline); overflow-wrap: anywhere; }
+.collab-events time { color: var(--rc-secondary); font-size: 11px; }
+@media(max-width:760px) { .collab-invite-form { grid-template-columns: minmax(0,1fr); } .collab-invitation { flex-wrap: wrap; } }

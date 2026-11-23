@@ -1,0 +1,22 @@
+{
+  "peaknet-package.zip": {
+    "bytes": 760723666,
+    "sha256": "9fbebabbfa8a9183da99968d70923b69e60d6329f676d14be9b3ec9b6a6ac4cb"
+  },
+  "ssnet-original.rar": {
+    "bytes": 128564,
+    "sha256": "7386c42fce257ab4069fa172ad55a7a9d3c8e260e48a93343c8c595bfb0a0959"
+  },
+  "vib2mol-agent-runtime.zip": {
+    "bytes": 3987800,
+    "sha256": "7b512455e34a6ab1218c54611320d11b5b5b7aaf25018db351b951580737867f"
+  },
+  "vib2mol-generation.pth": {
+    "bytes": 629767919,
+    "sha256": "3c418ce5709eea6047f479b54b8f334d6a4eeeda31f7a7b82834b821c418f167"
+  },
+  "vib2mol-matching.pth": {
+    "bytes": 629767919,
+    "sha256": "75c6b17399f105dd9a7ab99c1d3f49f37d0b507ea54565dbdb1cb782d3516eee"
+  }
+}

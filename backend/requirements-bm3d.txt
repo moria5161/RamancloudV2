@@ -1,0 +1,4 @@
+# Optional research dependency; binaries are for non-commercial use only.
+# https://pypi.org/project/bm3d/3.0.9/
+bm3d==3.0.9; python_version < "3.9"
+bm3d==4.0.3; python_version >= "3.9"
