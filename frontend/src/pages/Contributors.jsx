@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users, Heart, MapPin, Mail, Phone, Github, ExternalLink } from 'lucide-react';
 import { usePreferences } from '../i18n';
+import { REPOSITORY_URL } from '../content/repository';
 
 export default function Contributors() {
   const { language } = usePreferences();
@@ -107,7 +108,7 @@ export default function Contributors() {
             <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-gray-500" /> {isZh ? '厦门大学化学系 434 室，厦门 361005，中国' : 'Room 434, Department of Chemistry, Xiamen University, Xiamen 361005, China'}</div>
             <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-gray-500" /> +86-592-2186532</div>
             <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-gray-500" /> bren@xmu.edu.cn</div>
-            <a href="https://github.com/moria5161/RamancloudV2" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300">
+            <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300">
               <Github className="w-3.5 h-3.5" /> {isZh ? 'GitHub 仓库' : 'GitHub Repository'}
             </a>
           </div>

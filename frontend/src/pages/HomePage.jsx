@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Atom, BookOpen, Database, FileCheck2, FolderKanban, GitBranch, Github, History, Layers, LineChart, Mail, MessageCircle, Sparkles, Wrench } from 'lucide-react';
 import { usePreferences } from '../i18n';
 import { ANALYSIS_GUIDES, ASSISTANT_GUIDE_TITLE, localize } from '../content/platformGuide';
+import { REPOSITORY_URL } from '../content/repository';
 import RecentResearch from '../components/RecentResearch';
 import './LearningPages.css';
 
@@ -73,7 +74,7 @@ export default function HomePage() {
         </section>
 
         <RecentResearch />
-        <footer className="learning-footer"><p>Ren Research Group · Xiamen University</p><div><a href="mailto:xinyulu@stu.xmu.edu.cn" aria-label={txt('邮件联系', 'Contact by email')}><Mail size={17} /></a><a href="https://github.com/hzh040518/Ramancloud" target="_blank" rel="noopener noreferrer" aria-label={txt('RamanCloud 当前代码仓库', 'Current RamanCloud repository')}><Github size={17} /><span>GitHub</span></a></div></footer>
+        <footer className="learning-footer"><p>Ren Research Group · Xiamen University</p><div><a href="mailto:xinyulu@stu.xmu.edu.cn" aria-label={txt('邮件联系', 'Contact by email')}><Mail size={17} /></a><a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer" aria-label={txt('RamanCloud 当前代码仓库', 'Current RamanCloud repository')}><Github size={17} /><span>GitHub</span></a></div></footer>
       </div>
     </div>
   );

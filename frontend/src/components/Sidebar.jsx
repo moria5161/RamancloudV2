@@ -5,6 +5,7 @@ import { Home, Database, Atom, GitBranch, Layers, LineChart, BookOpen, Users, Gi
 import CloudLogo from './CloudLogo';
 import { useAuth } from '../auth';
 import { usePreferences } from '../i18n';
+import { REPOSITORY_URL } from '../content/repository';
 
 const navItems = [
   { to: '/', icon: Home, labelKey: 'homepage' },
@@ -95,7 +96,7 @@ export default function Sidebar() {
           </NavLink>
         </div>
         <a
-          href="https://github.com/hzh040518/Ramancloud"
+          href={REPOSITORY_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
