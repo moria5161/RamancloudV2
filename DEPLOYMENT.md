@@ -1,13 +1,13 @@
 # RamanCloud alpha deployment
 
-Use the `alpha` branch of [the deployment repository](https://github.com/moria5161/RamancloudV2/tree/alpha). This version is configured for `https://ramancloud.xmu.edu.cn/alpha/` behind the existing HTTPS virtual host. The backend listens on `127.0.0.1:5001`. Verify the path and port are free before installing the service. Clone each release into its own directory and record its Git SHA so it can be restored.
+Use the `alpha` branch of [the deployment repository](https://github.com/moria5161/RamancloudV2/tree/alpha). The public frontend is served at `/rc/`. The backend listens on `127.0.0.1:5001` and serves its API under `/alpha/api/`. Clone each release into its own directory and record its Git SHA so it can be restored.
 
 ## Prepare a release
 
 1. Use a dedicated unprivileged Linux user and group named `ramancloud-alpha`. Create `/srv/ramancloud-alpha/releases` for the source and build, and `/var/lib/ramancloud-alpha` for persistent data. Give the service user ownership and restrict write access.
 2. As that user, clone branch `alpha` into a new directory under `/srv/ramancloud-alpha/releases`, verify the intended commit, and run `bash scripts/prepare_alpha.sh` with Python 3.11, Node.js 24 or later and npm. This builds the frontend and installs the backend and the separate CPU SSnet runtime. For a smoke test of SSnet, upload a known reference spectrum, train with small settings, and verify extraction on a mixture covering the trained wave-number range.
 3. Install the example environment file as `/etc/ramancloud-alpha.env` with mode `0600` and configure the models below. Symlink `/srv/ramancloud-alpha/current` to the prepared release. Install `deploy/alpha/ramancloud-alpha.service` under `/etc/systemd/system/`, run `systemctl daemon-reload`, and start `ramancloud-alpha`. Check `curl -fsS http://127.0.0.1:5001/alpha/api/health` before exposing the route.
-4. Include `deploy/alpha/nginx.conf` inside the existing HTTPS virtual host, then test the complete Nginx configuration and reload it. Verify `/alpha/`, `/alpha/api/health`, a refresh on a nested page, and streaming AI responses. Enable `ramancloud-alpha` to start at boot after acceptance.
+4. For an `/alpha/` preview, include `deploy/alpha/nginx.conf` in the appropriate Nginx configuration. For the public `/rc/` deployment, follow the publishing section below. Verify the health check, a refresh on a nested page, and streaming AI responses. Enable `ramancloud-alpha` to start at boot after acceptance.
 
 For a preview without system-level access, use `~/ramancloud-alpha/releases`, link the chosen release as `~/ramancloud-alpha/current`, and put the private environment at `~/ramancloud-alpha/alpha.env` with `RAMANCLOUD_DATA_DIR` set to the absolute path of `~/ramancloud-alpha/state`. Install `deploy/alpha/ramancloud-alpha.user.service` as `~/.config/systemd/user/ramancloud-alpha.service` and run `systemctl --user daemon-reload` and `systemctl --user enable --now ramancloud-alpha`. The server operator can enable lingering for the service account to keep it running after SSH logout. Use one service variant at a time.
 
@@ -35,8 +35,13 @@ Ask the second maintainer to register individually. In **Personal Space → Acco
 
 For code rollback, return the `current` symlink to the previous release and restart alpha. For schema changes, test the compatibility of the previous release first and use a coordinated data restore when needed.
 
-## Serve the optimized release at the existing website address
+## Publish the frontend at `/rc/`
 
-Build the frontend with `RAMANCLOUD_BASE_PATH=/ VITE_RAMANCLOUD_API_BASE=/ramancloud-api npm run build`. The root build uses hash routes so requests for bookmarked workspace pages reach the existing gateway at `/`. Deploy the build in a versioned static directory and point the Nginx website root to it. Forward `/ramancloud-api/` to `http://127.0.0.1:5001/alpha/api/` to use the verified release's backend and persistent state.
+~~~bash
+cd frontend
+RAMANCLOUD_BASE_PATH=/rc/ VITE_RAMANCLOUD_API_BASE=/rc/ramancloud-api npm run build
+~~~
 
-Back up the active Nginx configuration before switching the root and API. Validate the configuration, reload Nginx, and verify the homepage, a workspace bookmark, an asset, and the API at the existing HTTPS address. To roll back, restore the backed-up configuration, test it, and reload Nginx. Keep both releases and their data directories available during the rollback period.
+Copy the contents of `dist/` into the `rc/` subdirectory of a versioned Nginx document root. Serve `rc/index.html` for `/rc/` and registered frontend routes such as `/rc/login` and `/rc/projects` so direct visits and refreshes work. Serve `/rc/assets/` and `/rc/research/` from the build with HTTP 404 for missing files. Route `/rc/ramancloud-api/` separately to `http://127.0.0.1:5001/alpha/api/`, preserving the query string and the upstream error response. Redirect `/` and `/rc` to `/rc/`.
+
+Back up the active Nginx configuration before switching the document root and routes. Run `nginx -t`, reload Nginx, and verify the homepage, a direct visit to a frontend route, JS and CSS, and `/rc/ramancloud-api/health`. Check that the health response is JSON and that a missing API route returns HTTP 404. Verify upload and download through the public gateway using a representative file, since the gateway and origin may have independent upload limits. To roll back, restore the backed-up Nginx configuration, test it, and reload Nginx. Keep both releases and their data directories available during the rollback period.
