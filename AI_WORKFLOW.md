@@ -1,6 +1,6 @@
 # 智能光谱处理
 
-入口：侧栏“智能光谱处理”，路径 `/preprocessing/ai-analysis`。原 `/spectral` 入口跳转至此；独立单光谱处理页面不再开放。混合物解析（SSnet）、库匹配（PeakNet）与结构生成（Vib2Mol）已接入，各模块需要准备对应环境和模型；已保存的预处理版本可直接带入。当前操作教程见站内 `/preprocessing/tutorial`，安装与限制见各模块说明。
+登录后从侧栏进入“智能光谱处理”。已完成的预处理版本可带入分峰拟合、混合物解析、库匹配或光谱到结构。各模块的模型和输入要求见对应说明。[智能光谱处理](https://ramancloud.xmu.edu.cn/rc/ai-analysis) · [在线教程](https://ramancloud.xmu.edu.cn/rc/tutorial)
 
 单光谱流程：上传数据 → 光谱处理 → 查看结果。继续调整、导出和共享均在结果区完成。
 
@@ -12,7 +12,7 @@
 4. “分析记录”统一找回未完成、完成、失败的分析与文件夹批次。最近任务和历史批次不再常驻处理页面。
 5. “共享到项目”才会向项目成员开放输入、参数与结果；“项目与数据”的共享结果直接打开已有记录。
 
-详见 [RECORDS_WORKFLOW.md](RECORDS_WORKFLOW.md)。V2 算法对应关系与窄峰保护见 [PREPROCESSING_ALGORITHMS.md](PREPROCESSING_ALGORITHMS.md)。
+也可从右侧助手生成预处理方案或运行一键预处理。详情见 [助手预处理](QA_ACTIONS.md)、[分析记录](RECORDS_WORKFLOW.md)和[当前算法目录](LEGACY_ALGORITHM_AUDIT.md)。
 
 ## 仪器格式转换与去鬼峰
 
@@ -175,4 +175,4 @@ Windows 启动文件会检查并尝试在后台启动已安装的 Ollama，不�
 下载完模型后，可在 `frontend` 运行 `node tests/ollama.e2e.cjs` 进行真实本地模型测试，
 覆盖界面授权、方案 JSON 校验和对话回答；需要 Playwright、Chrome 及已运行的前后端。
 
-平台登录地址为 `/preprocessing/login`，注册地址为 `/preprocessing/register`。保留正常的自动续登录；已登录时也可从侧栏“切换账号”打开登录页。登录后返回原请求的页面，退出或过期会话回到登录页。表单校验错误会转为文字提示，不再把后端错误对象直接渲染为 React 内容。
+已登录用户可从侧栏“切换账号”打开登录页。通过需要登录的页面进入时，登录后会返回原请求的页面。[登录](https://ramancloud.xmu.edu.cn/rc/login) · [注册](https://ramancloud.xmu.edu.cn/rc/register)

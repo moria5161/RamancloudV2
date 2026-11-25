@@ -2,7 +2,9 @@
 
 核对日期：2026-11-04。对照来源为 [原始 RamancloudV2 的 backend/app.py](https://github.com/moria5161/RamancloudV2/blob/main/backend/app.py)，核对实际数值函数而非仅比较下拉框名称。
 
-## V2 与当前智能单谱页
+当前部署版本的算法、F2P 和 AirNet 权重配置见 [算法目录与模型说明](LEGACY_ALGORITHM_AUDIT.md)。下表保留 2026-11-04 核对时的实现记录。
+
+## 2026-11-04 核对时的智能单谱实现
 
 | V2 名称 | V2 实际实现 | 当前入口 |
 | --- | --- | --- |

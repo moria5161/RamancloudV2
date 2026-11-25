@@ -1,7 +1,6 @@
 # 用户反馈与管理员处理
 
-入口：教程 `/preprocessing/tutorial#faq` 的“还有问题或建议？”表单；侧栏“我的反馈”。
-系统管理员侧栏显示“反馈管理”，路径 `/preprocessing/feedback`。
+普通用户可在教程的“常见问题”末尾提交反馈，从侧栏“我的反馈”查看处理进度。系统管理员从侧栏进入“反馈管理”。[在线教程](https://ramancloud.xmu.edu.cn/rc/tutorial#faq) · [反馈页面](https://ramancloud.xmu.edu.cn/rc/feedback)
 
 ## 使用
 

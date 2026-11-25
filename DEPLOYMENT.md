@@ -19,7 +19,9 @@ For a preview without system-level access, use `~/ramancloud-alpha/releases`, li
 
 ## Data and administrative accounts
 
-With the example configuration, SQLite lives at `/var/lib/ramancloud-alpha/ramancloud.db` and uploaded files at `/var/lib/ramancloud-alpha/stored_files`. Accounts, project metadata, analysis records, feedback and chat history features that opt into persistence use the server database. SSnet job files live under the storage directory. The global QA sidebar keeps its current session behavior.
+The hosted optimized edition uses MySQL for accounts, project metadata, analysis records and feedback. Self-hosted deployments can select MySQL using the [environment template](backend/.env.mysql.example). Set the application credentials in the service's private environment. The app creates its tables after the database has been provisioned.
+
+The default self-hosted configuration uses SQLite. With the example service directories, the SQLite database is at `/var/lib/ramancloud-alpha/ramancloud.db` and uploaded files are at `/var/lib/ramancloud-alpha/stored_files`. SSnet job files live under the storage directory. The QA sidebar keeps chat in the current session.
 
 Before migrating an existing site, identify and back up its database and storage as a pair. Check the schema and test a restored copy with alpha. For SQLite alpha backups, stop the alpha service briefly, archive the entire private state directory, and start the service again. Test restoration of accounts, files, and record links. If MySQL is already available, configure a dedicated database and credentials using `backend/.env.mysql.example` and take both a database backup and a matching file backup.
 

@@ -1,6 +1,6 @@
 # 混合物解析：SSnet 本地实验版
 
-页面：`http://127.0.0.1:5173/preprocessing/spectral-unmixing`。
+本地开发入口为 `http://127.0.0.1:5173/preprocessing/spectral-unmixing`。[打开线上混合物解析](https://ramancloud.xmu.edu.cn/rc/spectral-unmixing)
 正常启动前后端即可。本机复用 `.venv-vib2mol` 的 CPU PyTorch、NumPy、scikit-learn 环境；每次任务由独立进程执行，不额外开模型服务终端。
 
 ## 使用流程

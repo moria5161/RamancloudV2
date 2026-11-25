@@ -1,6 +1,6 @@
 # 库匹配：PeakNet 2805 类 Raman 识别
 
-页面 `/preprocessing/library-matching` 使用提供的 `库匹配算法.zip`，已连接真实模型、参考曲线、历史与下载。
+库匹配使用提供的 `库匹配算法.zip`，已连接真实模型、参考曲线、历史与下载。[打开库匹配](https://ramancloud.xmu.edu.cn/rc/library-matching)
 这是固定类别分类器：模型在普识纳米的 2805 类中排序；它不具备经过验证的库外物质拒识能力，也不是任意谱库的通用检索器。
 
 ## 页面流程
