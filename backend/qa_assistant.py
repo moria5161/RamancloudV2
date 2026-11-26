@@ -15,10 +15,10 @@ from urllib.error import URLError
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 from fastapi import Depends, File, Form, HTTPException, UploadFile
-from compute_queue import ComputeCancelled, stream_cancelled, stream_work
+from request_stream import stream_cancelled, stream_work
 from qa_context import install_context, task_evidence, record_evidence
 from qa_stream import tokens, ResponseTruncated
-from llm_runtime import ModelBusyError, compact_reference, axis_reference, AXIS_POLICY
+from llm_runtime import compact_reference, axis_reference, AXIS_POLICY
 from pydantic import BaseModel, Field
 
 import ai_workflow as workflow
@@ -222,9 +222,12 @@ def install_qa_assistant(app, h):
                 current['images'] = [image]
             if stream:
                 def events(emit):
+                    if not _SLOTS.acquire(blocking=False):
+                        raise HTTPException(429, '问答助手繁忙，请稍后重试。')
                     started = time.monotonic()
-                    chunks = tokens(settings, [dict(role='system', content=SYSTEM)] + previous + [current])
+                    chunks = None
                     try:
+                        chunks = tokens(settings, [dict(role='system', content=SYSTEM)] + previous + [current])
                         emit(type='metadata', provider=settings.get('provider'), model=settings.get('model'),
                              warnings=notices, sources=sources, evidence=evidence_task, attachment_summary=attachments)
                         if notices:
@@ -236,8 +239,6 @@ def install_qa_assistant(app, h):
                         emit(type='done')
                     except ResponseTruncated:
                         emit(type='done', truncated=True)
-                    except (ModelBusyError, ComputeCancelled):
-                        raise
                     except (TimeoutError, socket.timeout):
                         emit(type='error', message='本地模型响应超时，已生成文字保留，可缩短问题后重试。')
                     except URLError:
@@ -246,8 +247,11 @@ def install_qa_assistant(app, h):
                         LOG.warning('QA stream failed: category=%s elapsed=%.1fs', type(exc).__name__, time.monotonic()-started)
                         emit(type='error', message='模型未正常完成回答，已生成文字保留，请重试。')
                     finally:
-                        if hasattr(chunks, 'close'):
-                            chunks.close()
+                        try:
+                            if hasattr(chunks, 'close'):
+                                chunks.close()
+                        finally:
+                            _SLOTS.release()
                 return stream_work(events, '模型未正常完成回答，已生成文字保留，请重试。')
             answer = workflow.call_chat_completion(settings, [dict(role='system', content=SYSTEM)] + previous + [current],
                                                    max_tokens=1800, timeout=45)

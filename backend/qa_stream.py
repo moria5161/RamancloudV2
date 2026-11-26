@@ -5,7 +5,7 @@ import os
 import time
 from urllib.request import Request, urlopen
 import ai_workflow as workflow
-from llm_runtime import inference_slot, ollama_context_length
+from llm_runtime import ollama_context_length
 LOG = logging.getLogger(__name__)
 
 
@@ -27,7 +27,7 @@ def tokens(settings, messages):
     request = Request(workflow.ollama_base(settings) + '/api/chat', data=json.dumps(payload).encode(),
                       headers={'Content-Type': 'application/json'})
     size, seen, done = 0, False, False
-    with inference_slot(settings), urlopen(request, timeout=300) as response:
+    with urlopen(request, timeout=300) as response:
         start = time.monotonic()
         for line in response:
             size += len(line)

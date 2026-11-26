@@ -13,7 +13,7 @@ import { SPECTRAL_ACCEPT } from './ImportReport';
 import QAPlanCard from './QAPlanCard';
 import { checkPlanContext, executeQAPlan, executionInput, executionKey } from './qaExecution';
 import {addPlanToTimeline,updateTimelinePlan,chatHistory} from './qaTimeline';
-import { queuedRequest, queueStatus, readNDJSON } from '../queuedRequest';
+import { streamRequest, readNDJSON } from '../streamRequest';
 
 const ACCEPT = SPECTRAL_ACCEPT;
 const RUNNING = ['queued', 'running', 'stopping'];
@@ -176,10 +176,8 @@ export default function GlobalQAAssistant({ enabled }) {
         allow_ai: allowAI, context_key, inputs: context.inputs,
         parent_plan_id: plan?.context_key === context_key ? plan.id : undefined }));
       if (spectrum) form.append('spectrum', spectrum);
-      const data = await queuedRequest(BASE + '/qa-assistant/preprocessing-turn',
-        { headers, body: form, signal: abort.signal }, event => {
-          if (current()) setPhase(event.type === 'queued' ? queueStatus(event.ahead) : localize('正在识别所需的预处理步骤…'));
-        });
+      const data = await streamRequest(BASE + '/qa-assistant/preprocessing-turn',
+        { headers, body: form, signal: abort.signal });
       if (!current()) return;
       if (data.kind === 'clarification') {
         setMessages(previous => [...previous, { role: 'assistant', content: data.answer, clarification: true, preprocessing: !preset }]);
@@ -248,7 +246,6 @@ export default function GlobalQAAssistant({ enabled }) {
       const update = changes => { if (version === epoch.current && mounted.current) setMessages(previous => previous.map(m => m.id === replyId ? { ...m, ...changes, content: changes.delta !== undefined ? m.content + changes.delta : m.content } : m)); };
       await readNDJSON(response, item => {
         if (item.type === 'status') setPhase(item.message);
-        if (item.type === 'queued') setPhase(queueStatus(item.ahead));
         if (item.type === 'running') setPhase(localize('正在生成回答'));
         if (item.type === 'metadata') update({ provider: item.provider, model: item.model, warnings: item.warnings, evidence: item.evidence, sources: item.sources, summary: item.attachment_summary });
         if (item.type === 'delta') { received = true; update({ delta: item.text }); setPhase(localize("正在输出回答…")); }

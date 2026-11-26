@@ -1,9 +1,14 @@
 """SSnet HTTP permissions, grid alignment, persistence and cancellation."""
 import copy
+import io
+import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
+import qa_assistant
+import qa_stream
 import ssnet
 import app as backend
 from model_history import enrich_model_history
@@ -84,6 +89,54 @@ class SSnetCases:
             failed=self.wait_ssnet(job['id'])
             self.assertEqual(failed['status'],'failed')
             self.assertIn('QA worker failure',failed['error'])
+
+    def test_only_ssnet_jobs_wait_in_submission_order(self):
+        _, payload = self.ssnet_training()
+        first_started, release_first = threading.Event(), threading.Event()
+        started_jobs = []
+        training = dict(artifacts={'unet.pth':'hash','forest.joblib':'hash'}, network_sha256='network',
+                        loss_history=[.1], duration_seconds=.1)
+
+        def train(directory, request, update, cancelled):
+            started_jobs.append(directory.name)
+            if len(started_jobs) == 1:
+                first_started.set()
+                release_first.wait(12)
+            return training
+
+        def reply():
+            return self.format_upload('/api/qa-assistant/reply', 'example.csv',
+                                      b'400,1\n500,2\n600,3', fields=dict(message='介绍拉曼光谱', allow_ai='true', stream='true'),
+                                      file_field='spectrum')
+
+        wave = list(range(400, 432))
+        cube = dict(wavenumber=wave, spectra=[wave, wave], shape=[2, len(wave)], mode='series', steps=[])
+        model = dict(provider='ollama', model='qwen3:test', base_url='http://127.0.0.1:11434')
+        answer = io.BytesIO(b'{"message":{"content":"Complete answer"},"done":true,"done_reason":"stop"}\n')
+        with patch.object(ssnet, 'execute_local', side_effect=train), \
+             patch.object(qa_assistant.workflow, 'config', return_value=model), \
+             patch.object(qa_stream, 'urlopen', return_value=answer), ThreadPoolExecutor(2) as requests:
+            try:
+                first_code, first = self.call('/api/ssnet/train', payload)
+                self.assertEqual(first_code, 200, first)
+                self.assertTrue(first_started.wait(5))
+                second_code, second = self.call('/api/ssnet/train', dict(payload, name='Second reference'))
+                self.assertEqual(second_code, 200, second)
+                self.assertEqual(second['status'], 'queued')
+                hyper = requests.submit(self.call, '/api/process-hyperspectral?stream=true', cube)
+                chat = requests.submit(reply)
+                for future, end in ((hyper, 'result'), (chat, 'done')):
+                    code, body = future.result(timeout=5)
+                    self.assertEqual(code, 200, body)
+                    events = [json.loads(line) for line in body.decode().splitlines()]
+                    self.assertEqual(events[-1]['type'], end, events)
+                    self.assertFalse(any(item['type'] == 'queued' for item in events))
+                self.assertEqual(started_jobs, [first['id']])
+            finally:
+                release_first.set()
+            self.assertEqual(self.wait_ssnet(first['id'])['status'], 'completed')
+            self.assertEqual(self.wait_ssnet(second['id'])['status'], 'completed')
+            self.assertEqual(started_jobs, [first['id'], second['id']])
 
     def test_ssnet_cancellation_does_not_publish_an_unfinished_model(self):
         task,payload=self.ssnet_training()

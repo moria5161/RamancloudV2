@@ -13,7 +13,7 @@ For a preview without system-level access, use `~/ramancloud-alpha/releases`, li
 
 ## AI and algorithm models
 
-Hyperspectral processing, SSnet and AI model calls join one FIFO queue in the single application worker. Keep the production service at one worker for this queue. Queued browser requests receive progress events. Cap Ollama context with `RAMANCLOUD_OLLAMA_CONTEXT` and verify both chat and structured plan generation when changing it.
+SSnet training and mixture extraction run one job at a time in submission order. Keep the production service at one worker for the SSnet queue. Hyperspectral processing and AI requests run independently of SSnet jobs. The model server manages its own inference concurrency. Cap Ollama context with `RAMANCLOUD_OLLAMA_CONTEXT` and verify both chat and structured plan generation when changing it.
 
 - Run Ollama on the server with a loopback listener and pull the model from the environment file. Verify `/api/tags` on the Ollama listener and send one real chat through the website. The model consumes server CPU/RAM or GPU. The application can also use its existing DeepSeek or SiliconFlow provider through the server environment when the group supplies credentials. Keep provider keys in the restricted environment file.
 - Run `python3.11 scripts/setup_legacy_algorithms.py` for the preprocessing dependencies and public F2P checkpoint. Supply the compatible AirNet checkpoint from approved server storage and export `RAMANCLOUD_AIRNET_MODEL` pointing to it for the installer. Confirm F2P and AirNet availability and real inference before offering them to users.
@@ -49,3 +49,11 @@ RAMANCLOUD_BASE_PATH=/rc/ VITE_RAMANCLOUD_API_BASE=/rc/ramancloud-api npm run bu
 Copy the contents of `dist/` into the `rc/` subdirectory of a versioned Nginx document root. Serve `rc/index.html` for `/rc/` and registered frontend routes such as `/rc/login` and `/rc/projects` so direct visits and refreshes work. Serve `/rc/assets/` and `/rc/research/` from the build with HTTP 404 for missing files. Route `/rc/ramancloud-api/` separately to `http://127.0.0.1:5001/alpha/api/`, preserving the query string and the upstream error response. Redirect `/` and `/rc` to `/rc/`.
 
 Back up the active Nginx configuration before switching the document root and routes. Run `nginx -t`, reload Nginx, and verify the homepage, a direct visit to a frontend route, JS and CSS, and `/rc/ramancloud-api/health`. Check that the health response is JSON and that a missing API route returns HTTP 404. Verify upload and download through the public gateway using a representative file, since the gateway and origin may have independent upload limits. To roll back, restore the backed-up Nginx configuration, test it, and reload Nginx. Keep both releases and their data directories available during the rollback period.
+
+## Move V2 to a GPU host
+
+Keep the public `/rc/` and `/rc/ramancloud-api/` paths. When an existing origin also serves the legacy site, forward the V2 paths from that origin to the GPU host while keeping the legacy site's specific routes on the existing origin. Allow the GPU host's web server to accept requests from the existing origin, keep streaming API response buffering disabled, and keep the application, MySQL and Ollama listeners on loopback. Frontend builds keep the same public paths.
+
+Deploy and test the active V2 source and frontend build on the new machine with its own MySQL credentials. Copy the V2 database and persistent storage together, including the model checkpoints and approved model runtimes. After the test restore, pause writes on both instances while taking and importing the final snapshot. Compare table counts and check representative file references before switching traffic. Keep the original data and release for recovery, and keep the old V2 backend stopped after the new instance begins accepting writes.
+
+Use Ollama's published GPU support guidance for the driver and accelerator. Verify a real inference and confirm GPU offload in `ollama ps`.

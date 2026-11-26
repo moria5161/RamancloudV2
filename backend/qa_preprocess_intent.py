@@ -8,8 +8,6 @@ import numpy as np
 from pydantic import BaseModel, Field, StrictBool
 
 import ai_workflow as workflow
-from compute_queue import ComputeCancelled
-from llm_runtime import ModelBusyError
 from workflow_review import checked_region, scoped_steps
 
 
@@ -253,8 +251,6 @@ def model_intent(message, history, settings, previous, changes):
             role='user', content=json.dumps(request, ensure_ascii=False))], json_mode=True, max_tokens=850, timeout=30,
             output_schema=INTENT_SCHEMA if settings.get('provider') == 'ollama' else None)
         return Intent.parse_raw(raw)
-    except (ComputeCancelled, ModelBusyError):
-        raise
     except Exception:
         return None
 

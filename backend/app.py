@@ -26,7 +26,7 @@ import pywt
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from compute_queue import ComputeQueueError, compute_slot, stream_work
+from request_stream import stream_work
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, validator
 from scipy import sparse
@@ -2278,18 +2278,11 @@ def process_spectrum(payload: SpectrumPayload, current_user: Optional[Dict[str, 
 
 @app.post("/api/process-hyperspectral")
 def process_cube(payload: CubePayload, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user), stream: bool = False):
-    def process():
-        with compute_slot():
-            return _process_cube(payload, current_user)
-
     if stream:
         if current_user is None:
             raise HTTPException(401, "请先登录。")
-        return stream_work(lambda emit: process(), "高光谱处理失败，请重新提交。")
-    try:
-        return process()
-    except ComputeQueueError as exc:
-        raise HTTPException(429, str(exc)) from exc
+        return stream_work(lambda emit: _process_cube(payload, current_user), "高光谱处理失败，请重新提交。")
+    return _process_cube(payload, current_user)
 
 
 def _process_cube(payload, current_user):

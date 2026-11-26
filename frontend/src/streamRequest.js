@@ -1,9 +1,5 @@
 import { localize, systemText } from './locale.js';
 
-export function queueStatus(ahead) {
-  return `${localize('排队中')} · ${localize('前方任务数')} ${ahead}`;
-}
-
 export async function readNDJSON(response, onEvent) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -32,7 +28,7 @@ export async function readNDJSON(response, onEvent) {
   }
 }
 
-export async function queuedRequest(url, options, onStatus) {
+export async function streamRequest(url, options, onRunning) {
   const response = await fetch(`${url}?stream=true`, { ...options, method: 'POST' });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -41,7 +37,7 @@ export async function queuedRequest(url, options, onStatus) {
   let result;
   await readNDJSON(response, event => {
     if (event.type === 'result') result = event.data;
-    else if (event.type === 'queued' || event.type === 'running') onStatus(event);
+    else if (event.type === 'running') onRunning?.();
   });
   if (result === undefined) throw new Error(localize('请求中断，请重试。'));
   return result;

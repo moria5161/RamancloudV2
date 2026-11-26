@@ -257,8 +257,6 @@ export const systemTranslations = {
   '所选版本的实际算法、参数与执行状态': 'Actual algorithms, parameters and execution state of the selected version',
   '同波段完整数据的前后诊断与变化量（程序计算）': 'Computed before/after diagnostics and changes using the complete data over the same range',
   '已读取数据，正在生成回答': 'Data loaded; generating an answer', '正在生成回答': 'Generating an answer',
-  '计算队列已满，请稍后提交。': 'The processing queue is full. Please try again later.',
-  '等待计算超时，请重新提交。': 'The queue wait expired. Please submit again.',
   '本地模型正在处理其他请求，请稍后重试；已生成文字保留。': 'The local model is busy. Try again later; generated text is retained.',
   '本地模型响应超时，已生成文字保留，可缩短问题后重试。': 'The local model timed out. Generated text is retained; shorten the question and retry.',
   '模型连接断开，请检查 Ollama 是否正在运行；已生成文字保留。': 'Model connection lost. Check that Ollama is running; generated text is retained.',

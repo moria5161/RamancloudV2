@@ -100,29 +100,14 @@ class QaActionCases:
         self.assertEqual(event['type'], 'result', event)
         self.assertEqual(event['data']['kind'], 'plan', event)
 
-    def test_streamed_hyperspectral_processing_reports_waiting_and_returns_result(self):
-        from concurrent.futures import ThreadPoolExecutor
-        from compute_queue import COMPUTE_QUEUE
-
+    def test_streamed_hyperspectral_processing_reports_running_and_returns_result(self):
         wave = list(range(400, 432))
         payload = dict(wavenumber=wave, spectra=[wave, wave], shape=[2, len(wave)], mode='series', steps=[])
-        with ThreadPoolExecutor(max_workers=1) as worker:
-            with COMPUTE_QUEUE.reserve() as active:
-                active.acquire(timeout=0)
-                response = worker.submit(self.call, '/api/process-hyperspectral?stream=true', payload)
-                for _ in range(100):
-                    with COMPUTE_QUEUE.changed:
-                        if COMPUTE_QUEUE.waiting:
-                            break
-                    time.sleep(.02)
-                else:
-                    self.fail('The hyperspectral request did not enter the shared queue.')
-                self.assertFalse(response.done())
-                self.assertEqual(self.call('/api/health')[0], 200)
-            code, body = response.result(timeout=10)
+        code, body = self.call('/api/process-hyperspectral?stream=true', payload)
         self.assertEqual(code, 200)
         events = [json.loads(line) for line in body.decode().splitlines()]
-        self.assertIn(dict(type='queued', ahead=1), events)
+        self.assertIn(dict(type='running'), events)
+        self.assertFalse(any(item['type'] == 'queued' for item in events))
         self.assertEqual(events[-1]['type'], 'result', events)
         self.assertEqual(events[-1]['data']['code'], 0)
 

@@ -10,8 +10,8 @@ from fastapi import Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 import ai_workflow as workflow
 from qa_action_runtime import ActionRuntime, LABELS, MODULES, PARAMS, MODEL_OPS, hyper_registry
-from llm_runtime import ModelBusyError, axis_reference, AXIS_POLICY
-from compute_queue import ComputeCancelled, stream_cancelled, stream_work
+from llm_runtime import axis_reference, AXIS_POLICY
+from request_stream import RequestCancelled, stream_cancelled, stream_work
 from qa_preprocess_intent import TYPE_LABELS, compile_steps, interpret_preprocessing, preset_intent
 
 LOG=logging.getLogger(__name__)
@@ -237,10 +237,7 @@ def install_qa_actions(app,h):
     def preprocessing_turn(payload: str = Form(...), spectrum: UploadFile = File(None), user=Depends(auth), stream: bool = False):
         if stream:
             return stream_work(lambda emit: process_turn(payload, spectrum, user), '生成方案失败，请重试。')
-        try:
-            return process_turn(payload, spectrum, user)
-        except ModelBusyError as exc:
-            raise HTTPException(429, str(exc)) from exc
+        return process_turn(payload, spectrum, user)
 
     def process_turn(payload, spectrum, user):
         with db() as conn:
@@ -273,12 +270,17 @@ def install_qa_actions(app,h):
                 if parent['context_key'] == context_key:
                     previous = next((item['params']['steps'] for item in json.loads(parent['steps_json'])
                                      if item['action'] == 'preprocess'), [])
-            settings = workflow.config()
-            intent, local = interpret_preprocessing(goal, history, settings, previous, inputs.get('settings', {}).get('steps', []))
+            if not _PLAN_SLOTS.acquire(blocking=False):
+                raise HTTPException(429, '方案生成繁忙，请稍后重试。')
+            try:
+                settings = workflow.config()
+                intent, local = interpret_preprocessing(goal, history, settings, previous, inputs.get('settings', {}).get('steps', []))
+            finally:
+                _PLAN_SLOTS.release()
             if intent.kind == 'clarification':
                 return dict(kind='clarification', answer=intent.clarification)
         if stream_cancelled():
-            raise ComputeCancelled()
+            raise RequestCancelled()
         result = create_plan(payload, [spectrum] if spectrum else [], user, epoch=epoch,
                              intent=intent, previous=previous, planner_settings=settings, local=local)
         if result.get('clarification'):
@@ -396,8 +398,6 @@ def install_qa_actions(app,h):
                 if parent['context_key'] == context_key:
                     history = list(history) + [dict(role='assistant', content='上一份方案的真实参数（仅参考）：'+parent['steps_json'])]
             return generate_plan(goal, history, module, inputs)
-        except ModelBusyError:
-            raise HTTPException(429, '本地模型正在处理其他请求，请稍后生成方案；未创建分析任务。')
         except HTTPException:
             raise
         except Exception:

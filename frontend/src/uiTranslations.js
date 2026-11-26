@@ -54,7 +54,7 @@ export const uiTranslations = {
   '对所选光谱依次运行 despike、F2P 和 AirNet': 'Run despike, F2P and AirNet on the selected spectrum',
   '正在准备一键预处理…': 'Preparing quick preprocessing…',
   '正在识别所需的预处理步骤…': 'Identifying the requested preprocessing steps…',
-  '前方任务数': 'Tasks ahead', '正在运行高光谱处理…': 'Running hyperspectral processing…',
+  '正在运行高光谱处理…': 'Running hyperspectral processing…',
   '请求中断，请重试。': 'The request was interrupted. Please try again.',
   '允许已配置的模型读取本次问题及附带数据，可随时取消。': 'Allow the configured model to read this question and attached data. You can turn this off at any time.',
   '允许 AI 读取附带数据': 'Allow AI to read attached data',
