@@ -23,9 +23,9 @@ def load_model():
         raise ValueError('F2P model is unavailable; configure RAMANCLOUD_F2P_MODEL with the pretrained weights.')
     config = json.loads(Path(__file__).with_name('config.json').read_text(encoding='utf-8'))
     torch.set_num_threads(2)
-    device = torch.device('cpu')
+    device = torch.device(os.environ.get('RAMANCLOUD_LEGACY_DEVICE', 'cpu'))
     model = Fast2PeakRPE(**config)
-    state = torch.load(model_path, map_location=device, weights_only=True)
+    state = torch.load(model_path, map_location='cpu', weights_only=True)
     state = state.get('model_state_dict', state)
     state = {key.removeprefix('module.'): value for key, value in state.items()}
     model.load_state_dict(state, strict=True)

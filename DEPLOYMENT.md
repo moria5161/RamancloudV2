@@ -59,3 +59,5 @@ Deploy and test the active V2 source and frontend build on the new machine with 
 Use Ollama's published GPU support guidance for the driver and accelerator. Verify a real inference and confirm GPU offload in `ollama ps`.
 
 Install SSnet's CUDA environment with `python scripts/setup_ssnet.py --cuda`. Set `RAMANCLOUD_SSNET_DEVICE=cuda` in the V2 backend environment. If the CUDA environment lives outside `.venv-ssnet` in the checkout, set `RAMANCLOUD_SSNET_PYTHON` to its Python executable. Verify CUDA availability in that interpreter and run a small training and prediction job before serving production traffic.
+
+To use CUDA for hyperspectral TSVD and the neural passes of F2P and AirNet, set `RAMANCLOUD_HYPERSPECTRAL_CUDA_PYTHON` to a CUDA-enabled Python with `numpy`, `scipy`, `PyWavelets`, `pybaselines`, and PyTorch. The original weights and parameters still apply. The upload API advertises the supported chunk size in `/api/health`, then parses the completed file through the same path as a single-part upload.

@@ -227,6 +227,27 @@ class FormatCases:
         self.assertEqual(code, 200, result)
         self.assertEqual(result['data']['shape'], [2, 2, 8])
 
+    def test_hyperspectral_chunks_reuse_the_direct_upload_parser(self):
+        from uuid import uuid4
+        from unittest.mock import patch
+
+        source = b'Wavenumber\tx0_y0\tx1_y0\tx0_y1\tx1_y1\n400\t1\t2\t3\t4\n401\t5\t6\t7\t8\n402\t9\t10\t11\t12'
+        endpoint = '/api/upload-hyperspectral'
+        code, direct = self.format_upload(endpoint, 'map.txt', source)
+        self.assertEqual(code, 200, direct)
+        chunk_size = len(source) // 2 + 1
+        fields = dict(upload_id=str(uuid4()), total_size=len(source))
+        with patch('app.CHUNK_BYTES', chunk_size), patch('hyperspectral_upload.CHUNK_BYTES', chunk_size):
+            code, partial = self.format_upload(endpoint, 'map.txt', source[:chunk_size], fields)
+            self.assertEqual((code, partial['data']), (200, {'complete': False}))
+            extra = dict(fields, chunk_index=1)
+            code, _ = self.format_upload(endpoint, 'different.txt', source[chunk_size:], extra)
+            self.assertEqual(code, 409)
+            code, complete = self.format_upload(endpoint, 'map.txt', source[chunk_size:], extra)
+            self.assertEqual(code, 200, complete)
+        self.assertEqual({key: value for key, value in direct['data'].items() if key != 'dataset_id'},
+                         {key: value for key, value in complete['data'].items() if key != 'dataset_id'})
+
     def test_formats_http_project_auto_classifies_map_not_single_spectrum(self):
         code, project = self.call('/api/projects', dict(name='Format test'))
         self.assertEqual(code, 200, project)

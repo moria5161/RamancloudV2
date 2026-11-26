@@ -34,6 +34,7 @@ from scipy.signal import savgol_filter
 from scipy.sparse.linalg import spsolve
 from denoising.tshi import denoise as tshi_denoise, bm3d_available
 from hyperspectral_io import mat_result, MAX_UPLOAD, time_series_preview
+from hyperspectral_upload import CHUNK_BYTES, accept_chunk
 from legacy_algorithms import TSVDWorkLimitError
 from spectral_formats import parse_dataset, parse_single, SPECTRAL_EXTENSIONS
 from preprocessing.despike import despike_matrix, validate_order as validate_despike_order
@@ -1202,10 +1203,10 @@ def baseline_correct(y: np.ndarray, params: Dict[str, Any], method: str) -> Tupl
     return y - baseline, baseline
 
 
-def denoise_matrix(matrix: np.ndarray, params: Dict[str, Any], method: str) -> np.ndarray:
+def denoise_matrix(matrix: np.ndarray, params: Dict[str, Any], method: str, *, hyperspectral=False) -> np.ndarray:
     if method in __import__('legacy_algorithms').METHODS or str(method).startswith('v2_'):
         from legacy_algorithms import process
-        return process(matrix, params, method)[0]
+        return process(matrix, params, method, hyperspectral=hyperspectral)[0]
     if method == "tsvd":
         threshold = float(params.get("threshold", 1e-3))
         u, s, vh = np.linalg.svd(matrix, full_matrices=False)
@@ -1214,7 +1215,7 @@ def denoise_matrix(matrix: np.ndarray, params: Dict[str, Any], method: str) -> n
     return np.vstack([denoise_spectrum(row, params, method) for row in matrix])
 
 
-def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step], spatial_shape=None) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], List[Dict[str, Any]]]:
+def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step], spatial_shape=None, *, hyperspectral=False) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], List[Dict[str, Any]]]:
     validate_despike_order(steps)
     current_wn = wavenumber.copy()
     current = data.copy()
@@ -1257,12 +1258,12 @@ def apply_pipeline(wavenumber: np.ndarray, data: np.ndarray, steps: List[Step], 
                     baseline = baseline[:, details['selected_band_indices']]
                 record['details'] = details
             else:
-                current = denoise_matrix(current, params, step.method)
+                current = denoise_matrix(current, params, step.method, hyperspectral=hyperspectral)
             history.append(record)
         elif step.type == "baseline":
             if step.method in __import__('legacy_algorithms').METHODS or step.method.startswith('v2_'):
                 from legacy_algorithms import process
-                current, baseline = process(current, params, step.method)
+                current, baseline = process(current, params, step.method, hyperspectral=hyperspectral)
                 history.append({"type":"baseline","method":step.method,"params":params})
                 continue
             corrected = []
@@ -1375,6 +1376,7 @@ def health() -> Dict[str, Any]:
             "baseline": ["airpls", "aspls", "aabs", "imodpoly", "penalizedpoly", "rollingball", "mormol", "snip", "irsqr", "skip"],
             "spectra_demos": list(DEMO_SPECTRA),
             "mapping_demos": list(DEMO_MAPPING),
+            "hyperspectral_upload": {"chunk_bytes": CHUNK_BYTES},
         },
     }
 
@@ -1982,7 +1984,8 @@ def rerun_analysis(run_id: str, current_user: Dict[str, Any] = Depends(get_curre
         wave = dataset["wavenumber"]
         spectra = source_data.reshape(-1, source_data.shape[-1]) if source_data.ndim == 3 else source_data
         try:
-            out_wave, out_spectra, baseline, history = apply_pipeline(wave, spectra, steps, source_data.shape[:2] if dataset['mode'] == 'imaging' and source_data.ndim == 3 else None)
+            spatial_shape = source_data.shape[:2] if dataset['mode'] == 'imaging' and source_data.ndim == 3 else None
+            out_wave, out_spectra, baseline, history = apply_pipeline(wave, spectra, steps, spatial_shape, hyperspectral=True)
         except TSVDWorkLimitError as exc:
             raise HTTPException(status_code=413, detail=str(exc)) from exc
         except ValueError as exc:
@@ -2157,9 +2160,20 @@ async def upload_mapping(
     width: Optional[int] = Form(None),
     layout: str = Form("auto"),
     pixel_order: str = Form("F"),
+    upload_id: Optional[str] = Form(None),
+    chunk_index: int = Form(0),
+    total_size: Optional[int] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    content = await file.read(MAX_UPLOAD + 1)
+    if upload_id is None:
+        content = await file.read(MAX_UPLOAD + 1)
+    else:
+        chunk = await file.read(CHUNK_BYTES + 1)
+        descriptor = (file.filename, mode, instrument, height, width, layout, pixel_order)
+        content = await run_in_threadpool(accept_chunk, DATA_DIR, str(current_user['id']), upload_id,
+                                          chunk_index, total_size, chunk, MAX_UPLOAD, descriptor)
+        if content is None:
+            return {"code": 0, "data": {"complete": False}}
     if not content or len(content) > MAX_UPLOAD:
         raise HTTPException(status_code=400, detail="文件为空或超过 128 MB。")
     try:
@@ -2311,7 +2325,7 @@ def _process_cube(payload, current_user):
             spectra = spectra.reshape(-1, spectra.shape[-1])
     spatial_shape = original_shape[:2] if mode == 'imaging' and len(original_shape) == 3 else None
     try:
-        out_wave, out_spectra, baseline, history = apply_pipeline(wave, spectra, payload.steps, spatial_shape)
+        out_wave, out_spectra, baseline, history = apply_pipeline(wave, spectra, payload.steps, spatial_shape, hyperspectral=True)
     except TSVDWorkLimitError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except ValueError as exc:

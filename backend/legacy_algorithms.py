@@ -11,6 +11,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = json.loads((ROOT / 'legacy_algorithm_catalog.json').read_text(encoding='utf-8'))
 METHODS = {s['method']: s for s in CATALOG}
+CUDA_METHODS = {'f2p', 'airnet', 'tsvd'}
 _SLOT = threading.BoundedSemaphore(1)
 TSVD_MAX_WORK = int(os.getenv('RAMANCLOUD_TSVD_MAX_WORK', '20000000000'))
 
@@ -27,11 +28,12 @@ def python_path():
     return env / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
 
 
-def availability(spec):
+def availability(spec, interpreter=None, *, cuda=False):
     if spec['method'] in ('sg','wtd'):return True,''
-    if not python_path().is_file():
+    interpreter = interpreter or python_path()
+    if not interpreter.is_file():
         return False, '请先运行 scripts/setup_legacy_algorithms.py 准备独立环境'
-    env = python_path().parent.parent if python_path().parent.name.lower() in ('scripts','bin') else python_path().parent
+    env = interpreter.parent.parent if interpreter.parent.name.lower() in ('scripts','bin') else interpreter.parent
     sites = [env/'Lib/site-packages'] + list((env/'lib').glob('python*/site-packages'))
     for package in ('numpy', 'scipy', 'pywt', 'pybaselines'):
         if not any((site/package).is_dir() for site in sites):
@@ -40,7 +42,7 @@ def availability(spec):
     weight = {'f2p': 'RAMANCLOUD_F2P_MODEL', 'airnet': 'RAMANCLOUD_AIRNET_MODEL'}.get(original)
     if weight and not model_path(original).is_file():
         return False, '需配置原版兼容模型权重：' + weight
-    if weight and not any((site/'torch').is_dir() for site in sites):
+    if (weight or cuda) and not any((site/'torch').is_dir() for site in sites):
         return False, '原版模型需要在独立环境安装 PyTorch 2.5 或更新兼容版本'
     return True, ''
 
@@ -49,12 +51,14 @@ def catalog():
     return [dict(s, available=availability(s)[0], unavailable_reason=availability(s)[1]) for s in CATALOG]
 
 
-def process(matrix, params, method):
+def process(matrix, params, method, *, hyperspectral=False):
     method = method.removeprefix('v2_') if hasattr(method,'removeprefix') else method[3:] if method.startswith('v2_') else method
     spec = METHODS.get(method)
     if spec is None:
         raise ValueError('不支持的算法')
-    ready, reason = availability(spec)
+    gpu_python = os.environ.get('RAMANCLOUD_HYPERSPECTRAL_CUDA_PYTHON') if hyperspectral and method in CUDA_METHODS else None
+    interpreter = Path(gpu_python) if gpu_python else python_path()
+    ready, reason = availability(spec, interpreter, cuda=True) if gpu_python else availability(spec)
     if not ready:
         raise ValueError(reason)
     values = np.asarray(matrix, dtype=float)
@@ -94,8 +98,8 @@ def process(matrix, params, method):
         np.save(directory/'input.npy', values, allow_pickle=False)
         (directory/'request.json').write_text(json.dumps(dict(method=spec['original_method'], kind=spec['type'], params=normalized)), encoding='utf-8')
         try:
-            result = subprocess.run([str(python_path()), str(ROOT/'backend/legacy_algorithm_worker.py'), str(directory)], capture_output=True, timeout=600,
-                env=dict(os.environ,OPENBLAS_NUM_THREADS='1',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',NUMEXPR_NUM_THREADS='1',RAMANCLOUD_F2P_MODEL=str(model_path('f2p')),RAMANCLOUD_AIRNET_MODEL=str(model_path('airnet'))))
+            result = subprocess.run([str(interpreter), str(ROOT/'backend/legacy_algorithm_worker.py'), str(directory)], capture_output=True, timeout=600,
+                env=dict(os.environ,OPENBLAS_NUM_THREADS='1',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',NUMEXPR_NUM_THREADS='1',RAMANCLOUD_F2P_MODEL=str(model_path('f2p')),RAMANCLOUD_AIRNET_MODEL=str(model_path('airnet')),RAMANCLOUD_LEGACY_DEVICE='cuda' if gpu_python else 'cpu'))
         except subprocess.TimeoutExpired:
             raise ValueError('算法运行超时，请减少输入规模')
         if result.returncode:

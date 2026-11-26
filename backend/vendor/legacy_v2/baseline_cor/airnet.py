@@ -118,9 +118,9 @@ def load_model():
     if not model_path.is_file():
         raise ValueError('AirNet model is unavailable; configure RAMANCLOUD_AIRNET_MODEL with the pretrained weights.')
     torch.set_num_threads(2)
-    device = torch.device("cpu")
+    device = torch.device(os.environ.get('RAMANCLOUD_LEGACY_DEVICE', 'cpu'))
     model = ResUNet_2500(num_convs=4, batch_norm=True)
-    state_dict = torch.load(model_path, map_location=device, weights_only=True)
+    state_dict = torch.load(model_path, map_location='cpu', weights_only=True)
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -236,7 +236,7 @@ def airnet_process(matrix):
     varying = np.flatnonzero(np.ptp(matrix, axis=1) != 0)
     if not len(varying):
         return result
-    # Serialize CPU inference to bound memory when multiple web requests arrive together.
+    # Bound inference memory when multiple web requests arrive together.
     with _inference_lock:
         model, device = load_model()
         target = np.linspace(0, 1, 2500)

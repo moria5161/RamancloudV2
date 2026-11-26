@@ -147,7 +147,6 @@ export default function HyperspectralProcessing() {
     try {
       setError(null);
       const formData = new FormData();
-      formData.append('file', file);
       formData.append('instrument', uploadInstrument);
       formData.append('mode', uploadMode);
       if (matHeight) formData.append('height', matHeight);
@@ -155,7 +154,29 @@ export default function HyperspectralProcessing() {
       formData.append('layout', matLayout);
       formData.append('pixel_order', pixelOrder);
 
-      const { data: res } = await axios.post(`${API_BASE}/upload-hyperspectral`, formData);
+      if (file.size > 128 * 1024 * 1024) throw new Error(localize('文件为空或超过 128 MB。'));
+      let chunkBytes = 0;
+      if (file.size > 900 * 1024) {
+        const { data: health } = await axios.get(`${API_BASE}/health`);
+        chunkBytes = health.data?.hyperspectral_upload?.chunk_bytes || 0;
+      }
+      let res;
+      if (!chunkBytes || file.size <= chunkBytes) {
+        formData.set('file', file);
+        ({ data: res } = await axios.post(`${API_BASE}/upload-hyperspectral`, formData));
+      } else {
+        formData.set('upload_id', crypto.randomUUID());
+        formData.set('total_size', String(file.size));
+        for (let offset = 0; offset < file.size; offset += chunkBytes) {
+          const end = Math.min(offset + chunkBytes, file.size);
+          formData.set('chunk_index', String(offset / chunkBytes));
+          formData.set('file', file.slice(offset, end), file.name);
+          ({ data: res } = await axios.post(`${API_BASE}/upload-hyperspectral`, formData));
+          if (end < file.size && res.data?.complete !== false) {
+            throw new Error('高光谱上传未确认，请重新选择文件。');
+          }
+        }
+      }
       if (res.code === 0) {
         setRawData(res.data);
         setMode(res.data.mode);
@@ -179,7 +200,7 @@ export default function HyperspectralProcessing() {
         showError(res.msg);
       }
     } catch (e) {
-      showError(apiErrorMessage(e, '无法上传高光谱数据。'));
+      showError(apiErrorMessage(e, e.response ? '无法上传高光谱数据。' : e.message || '无法上传高光谱数据。'));
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
