@@ -4,6 +4,29 @@ import app as backend
 
 
 class CollaborationCases:
+    def test_login_dates_follow_successful_session_creation(self):
+        username = 'login_test_' + uuid.uuid4().hex[:10]
+        password = 'test-password'
+        code, registration = self.request('/api/auth/register', dict(username=username, password=password))
+        self.assertEqual(code, 200, registration)
+        auth = registration['data']
+        user_id = auth['user']['id']
+        with backend.db_connect() as conn:
+            original_session = conn.execute('SELECT created_at FROM sessions WHERE user_id=?', (user_id,)).fetchone()['created_at']
+            self.assertEqual(auth['user']['last_login'], original_session)
+            conn.execute('UPDATE users SET last_login=NULL WHERE id=?', (user_id,))
+
+        backend.init_auth_db()
+        self.assertEqual(self.request('/api/auth/me', token=auth['token'])[1]['data']['user']['last_login'], original_session)
+        self.assertEqual(self.request('/api/auth/login', dict(identifier=username, password='wrong-password'))[0], 401)
+        self.assertEqual(self.request('/api/auth/me', token=auth['token'])[1]['data']['user']['last_login'], original_session)
+
+        code, login = self.request('/api/auth/login', dict(identifier=username, password=password))
+        self.assertEqual(code, 200, login)
+        last_login = login['data']['user']['last_login']
+        self.assertGreater(last_login, original_session)
+        self.assertEqual(self.request('/api/auth/me', token=auth['token'])[1]['data']['user']['last_login'], last_login)
+
     def project(self):
         code, result = self.call('/api/projects', dict(name='Collaboration test'))
         self.assertEqual(code, 200, result)

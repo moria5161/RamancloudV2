@@ -384,6 +384,15 @@ def init_auth_db() -> None:
         )
         create_index(conn, "idx_sessions_user_id", "sessions", "user_id")
         create_index(conn, "idx_sessions_expires_at", "sessions", "expires_at")
+        # Earlier versions issued a session during registration without recording the login.
+        conn.execute(
+            """
+            UPDATE users
+            SET last_login = (SELECT MAX(created_at) FROM sessions WHERE sessions.user_id = users.id)
+            WHERE last_login IS NULL
+              AND EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)
+            """
+        )
         conn.execute(
             f"""
             CREATE TABLE IF NOT EXISTS projects (
@@ -581,10 +590,13 @@ def row_to_analysis_version(row: sqlite3.Row) -> Dict[str, Any]:
 
 def create_session(conn: sqlite3.Connection, user_id: str) -> str:
     token = secrets.token_urlsafe(32)
-    expires_at = (utc_now() + timedelta(days=SESSION_DAYS)).isoformat()
+    now = utc_now()
+    created_at = now.isoformat()
+    expires_at = (now + timedelta(days=SESSION_DAYS)).isoformat()
+    conn.execute("UPDATE users SET last_login = ?, updated_at = ? WHERE id = ?", (created_at, created_at, user_id))
     conn.execute(
         "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-        (hash_token(token), user_id, iso_now(), expires_at),
+        (hash_token(token), user_id, created_at, expires_at),
     )
     return token
 
@@ -1425,8 +1437,6 @@ def login(payload: LoginPayload) -> Dict[str, Any]:
             raise HTTPException(status_code=401, detail="Username or password is incorrect.")
         if not bool(user_row["is_active"]):
             raise HTTPException(status_code=403, detail="This account has been disabled.")
-        now = iso_now()
-        conn.execute("UPDATE users SET last_login = ?, updated_at = ? WHERE id = ?", (now, now, user_row["id"]))
         token = create_session(conn, user_row["id"])
         updated_row = conn.execute("SELECT * FROM users WHERE id = ?", (user_row["id"],)).fetchone()
 
