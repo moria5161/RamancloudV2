@@ -90,6 +90,25 @@ class SSnetCases:
             self.assertEqual(failed['status'],'failed')
             self.assertIn('QA worker failure',failed['error'])
 
+    def test_ssnet_cuda_deployment_uses_gpu_for_training_and_prediction(self):
+        _, payload = self.ssnet_training()
+        mixture = self.task()
+        output = dict(artifacts={'unet.pth': 'hash', 'forest.joblib': 'hash'},
+                      network_sha256='network', loss_history=[.1], duration_seconds=.1)
+        with patch.object(ssnet, 'SSNET_DEVICE', 'cuda'), patch.object(ssnet, 'execute_local', return_value=output) as worker:
+            code, config = self.call('/api/ssnet/config')
+            self.assertEqual((code, config['device']), (200, 'cuda'))
+            code, job = self.call('/api/ssnet/train', dict(payload, device='cpu'))
+            self.assertEqual(code, 200, job)
+            self.assertEqual(self.wait_ssnet(job['id'])['status'], 'completed')
+            self.assertEqual(worker.call_args.args[1]['input']['settings']['device'], 'cuda')
+            worker.side_effect = RuntimeError('Stop after capturing worker input')
+            code, result = self.call('/api/ssnet/predict', dict(workflow_id=mixture['id'], model_id=job['id'],
+                                                               unit_confirmed=True))
+            self.assertEqual(code, 200, result)
+            self.assertEqual(self.wait_ssnet(result['id'])['status'], 'failed')
+            self.assertEqual(worker.call_args.args[1]['input']['device'], 'cuda')
+
     def test_only_ssnet_jobs_wait_in_submission_order(self):
         _, payload = self.ssnet_training()
         first_started, release_first = threading.Event(), threading.Event()

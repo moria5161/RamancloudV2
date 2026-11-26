@@ -15,7 +15,7 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ssnet_contract import ACTIVE, PYTHON, ROOT, align, prepare_standards, runtime_ready
+from ssnet_contract import ACTIVE, PYTHON, ROOT, SSNET_DEVICE, align, prepare_standards, runtime_ready
 from module_records import ModuleRecords
 
 
@@ -37,7 +37,7 @@ class Training(BaseModel):
     batch_size: int = Field(4, ge=2, le=8)
     rf_samples: int = Field(4000, ge=32, le=4000)
     trees: int = Field(500, ge=10, le=500)
-    device: str = Field('cpu', regex='^(cpu|cuda)$')
+    device: str = Field(SSNET_DEVICE, regex='^(cpu|cuda)$')
 
 
 class Prediction(Source):
@@ -160,7 +160,10 @@ def install_ssnet(app, h):
             prepared = prepare_standards(sources, payload.dict())
         except (ValueError, TypeError) as exc:
             raise HTTPException(400, str(exc)) from exc
-        return dict(settings=payload.dict(exclude={'standards', 'unit_confirmed'}), sources=sources,
+        settings = payload.dict(exclude={'standards', 'unit_confirmed'})
+        if SSNET_DEVICE == 'cuda':
+            settings['device'] = SSNET_DEVICE
+        return dict(settings=settings, sources=sources,
                     source_names=names, prepared=prepared, projects=projects)
 
     def prediction_input(payload, user):
@@ -178,6 +181,7 @@ def install_ssnet(app, h):
         from model_history import ssnet_training_parameters
         return dict(source=sources[0], source_names=names, prepared=prepared,
                     source_project_id=projects[0] if projects else None,
+                    device=SSNET_DEVICE,
                     model_id=model['id'], model_name=model['name'], grid=model['input']['prepared']['grid'],
                     training_parameters=ssnet_training_parameters(model['input']['settings']),
                     network_sha256=model['result'].get('network_sha256'),
@@ -253,7 +257,7 @@ def install_ssnet(app, h):
 
     @app.get('/api/ssnet/config')
     def config(user=Depends(auth)):
-        return dict(ready=runtime_ready(), algorithm='SSnet · U-Net ECA + Random Forest', device='cpu',
+        return dict(ready=runtime_ready(), algorithm='SSnet · U-Net ECA + Random Forest', device=SSNET_DEVICE,
                     message='CPU 模式。训练可在后台运行或停止，耗时取决于运行环境。')
 
     @app.post('/api/ssnet/train/validate')

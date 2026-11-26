@@ -1,14 +1,18 @@
 """Physical-axis contracts shared by SSnet training and prediction."""
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = ROOT / '.venv-vib2mol' / 'Scripts' / 'python.exe'
-if not PYTHON.exists():
-    PYTHON = ROOT / '.venv-vib2mol' / 'bin' / 'python'
+SSNET_DEVICE = os.environ.get('RAMANCLOUD_SSNET_DEVICE', 'cpu').strip().lower()
+if SSNET_DEVICE not in ('cpu', 'cuda'):
+    raise ValueError('RAMANCLOUD_SSNET_DEVICE must be cpu or cuda')
+python_executable = 'Scripts/python.exe' if os.name == 'nt' else 'bin/python'
+environment = '.venv-ssnet' if SSNET_DEVICE == 'cuda' else '.venv-vib2mol'
+PYTHON = Path(os.environ.get('RAMANCLOUD_SSNET_PYTHON') or ROOT / environment / python_executable)
 ACTIVE = ('queued', 'running')
 
 

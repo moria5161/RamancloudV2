@@ -1,7 +1,7 @@
 # 混合物解析：SSnet 本地实验版
 
 本地开发入口为 `http://127.0.0.1:5173/preprocessing/spectral-unmixing`。[打开线上混合物解析](https://ramancloud.xmu.edu.cn/rc/spectral-unmixing)
-正常启动前后端即可。本机复用 `.venv-vib2mol` 的 CPU PyTorch、NumPy、scikit-learn 环境；每次任务由独立进程执行，不额外开模型服务终端。
+每次任务由独立进程执行。GPU 部署在 CUDA 上运行 U-Net 训练和推理，随机森林和数据准备使用 CPU。训练和解析共用一个队列，任务按提交顺序执行。本机可复用 `.venv-vib2mol` 的 CPU 环境。
 
 ## 使用流程
 
@@ -37,7 +37,7 @@ py -3.12 scripts/setup_ssnet.py
 # 仅在本次安装需要代理时加 --proxy http://127.0.0.1:实际端口
 ```
 
-随后正常运行 backend/app.py、frontend 的 npm run dev。安装脚本不会启动训练。后端默认 CPU；GPU 环境准备 CUDA 版 PyTorch 后，训练 API 可指定 device=cuda，前端本地版默认 CPU。
+随后正常运行 backend/app.py、frontend 的 npm run dev。在 GPU 主机上运行 `python scripts/setup_ssnet.py --cuda`，然后为后端设置 `RAMANCLOUD_SSNET_DEVICE=cuda`。如果 CUDA 环境装在项目目录之外，再用 `RAMANCLOUD_SSNET_PYTHON` 指定解释器绝对路径。
 
 记录在当前后端数据库 `ssnet_jobs` 中，运行文件在当前 `RAMANCLOUD_STORAGE_DIR/ssnet/<job-id>`，包含输入请求、真实进度、worker.log、权重和结果。用户隔离，项目数据每次读取和发布完成结果时重查成员权限；普通接口不接收服务器路径。
 

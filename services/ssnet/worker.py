@@ -72,6 +72,10 @@ def run(request, directory):
     rng = np.random.default_rng(42)
     started = time.monotonic()
     data = request['input']
+    device_name = data['settings']['device'] if request['kind'] == 'train' else data.get('device', 'cpu')
+    if device_name == 'cuda' and not torch.cuda.is_available():
+        raise ValueError('SSnet 的 CUDA 运行环境当前不可用，请联系管理员。')
+    device = torch.device(device_name)
 
     def progress(percent, stage, **extra):
         write_json(directory / 'progress.json', dict(percent=round(percent, 2), stage=stage,
@@ -79,9 +83,6 @@ def run(request, directory):
 
     if request['kind'] == 'train':
         settings, prepared = data['settings'], data['prepared']
-        if settings['device'] == 'cuda' and not torch.cuda.is_available():
-            raise ValueError('当前环境没有可用的 CUDA。请选择本地 CPU；GPU 训练需使用 CUDA 环境。')
-        device = torch.device(settings['device'])
         model = Unet(prepared['grid']['points']).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
         amp = device.type == 'cuda'
@@ -143,13 +144,13 @@ def run(request, directory):
                 raise ValueError('模型文件校验失败，请重新训练该标准品模型。')
         model = Unet(data['grid']['points'])
         model.load_state_dict(torch.load(model_dir/'unet.pth', map_location='cpu', weights_only=True), strict=True)
-        model.eval()
+        model.to(device).eval()
         # This path is server-generated, not an uploaded model or a request path.
         forest = joblib.load(model_dir/'forest.joblib')
         spectrum = np.asarray(data['prepared']['intensity'], dtype=np.float32)
         progress(35, 'extracting')
         with torch.inference_mode():
-            predicted = model(torch.as_tensor(spectrum).reshape(1,1,-1))[0,0].numpy()
+            predicted = model(torch.as_tensor(spectrum, device=device).reshape(1, 1, -1))[0, 0].cpu().numpy()
         extracted = spectrum - predicted
         score = None
         if extracted.max() > 0:
@@ -160,7 +161,7 @@ def run(request, directory):
                       extracted=(extracted*scale).tolist(), background=(predicted*scale).tolist(),
                       removed_offset=data['prepared']['offset'], model_name=data['model_name'],
                       model_id=data['model_id'], rf_score=score, score_type='synthetic_random_forest',
-                      duration_seconds=round(time.monotonic()-started, 2), inference_performed=True,
+                      duration_seconds=round(time.monotonic()-started, 2), inference_performed=True, device=str(device),
                       note='目标成分提取与估计背景，不是对所有组分的联合分解；RF 得分不是浓度、检出限或经标定的鉴定概率。')
         if not all(np.isfinite(result[key]).all() for key in ['mixture','extracted','background']):
             raise ValueError('模型输出包含无效数值。')

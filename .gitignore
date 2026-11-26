@@ -4,6 +4,7 @@ logs/
 backend/venv/
 .venv/
 .venv-vib2mol/
+.venv-ssnet/
 .runtime/
 /vib2mol_agent.zip
 /库匹配算法.zip

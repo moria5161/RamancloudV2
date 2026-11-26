@@ -13,6 +13,7 @@ from qa_action_runtime import ActionRuntime, LABELS, MODULES, PARAMS, MODEL_OPS,
 from llm_runtime import axis_reference, AXIS_POLICY
 from request_stream import RequestCancelled, stream_cancelled, stream_work
 from qa_preprocess_intent import TYPE_LABELS, compile_steps, interpret_preprocessing, preset_intent
+from ssnet_contract import SSNET_DEVICE
 
 LOG=logging.getLogger(__name__)
 ACTIVE=('queued','running','stopping')
@@ -51,7 +52,7 @@ def plan_catalog():
                 rf_samples=n(320,32,4000,'RF样本数',True),trees=n(100,10,500,'树数量',True))),
         defaults=dict(library_match=dict(top_k=5,preprocessing_mode='auto'),
             structure_generate=dict(engine='official',top_k=5,formula='',rerank=True),
-            ssnet_train=dict(name='目标标准品',points=1024,epochs=20,samples_per_epoch=320,batch_size=4,rf_samples=320,trees=100,device='cpu'),
+            ssnet_train=dict(name='目标标准品',points=1024,epochs=20,samples_per_epoch=320,batch_size=4,rf_samples=320,trees=100,device=SSNET_DEVICE),
             split=dict(instrument='auto'),convert=dict(conversion='horiba_to_nanophoton'),
             export=dict(format='txt',original=False,processed=True)))
 

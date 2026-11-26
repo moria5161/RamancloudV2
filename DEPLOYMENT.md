@@ -57,3 +57,5 @@ Keep the public `/rc/` and `/rc/ramancloud-api/` paths. When an existing origin 
 Deploy and test the active V2 source and frontend build on the new machine with its own MySQL credentials. Copy the V2 database and persistent storage together, including the model checkpoints and approved model runtimes. After the test restore, pause writes on both instances while taking and importing the final snapshot. Compare table counts and check representative file references before switching traffic. Keep the original data and release for recovery, and keep the old V2 backend stopped after the new instance begins accepting writes.
 
 Use Ollama's published GPU support guidance for the driver and accelerator. Verify a real inference and confirm GPU offload in `ollama ps`.
+
+Install SSnet's CUDA environment with `python scripts/setup_ssnet.py --cuda`. Set `RAMANCLOUD_SSNET_DEVICE=cuda` in the V2 backend environment. If the CUDA environment lives outside `.venv-ssnet` in the checkout, set `RAMANCLOUD_SSNET_PYTHON` to its Python executable. Verify CUDA availability in that interpreter and run a small training and prediction job before serving production traffic.
