@@ -13,6 +13,8 @@ For a preview without system-level access, use `~/ramancloud-alpha/releases`, li
 
 ## AI and algorithm models
 
+Hyperspectral processing, SSnet and AI model calls join one FIFO queue in the single application worker. Keep the production service at one worker for this queue. Queued browser requests receive progress events. Cap Ollama context with `RAMANCLOUD_OLLAMA_CONTEXT` and verify both chat and structured plan generation when changing it.
+
 - Run Ollama on the server with a loopback listener and pull the model from the environment file. Verify `/api/tags` on the Ollama listener and send one real chat through the website. The model consumes server CPU/RAM or GPU. The application can also use its existing DeepSeek or SiliconFlow provider through the server environment when the group supplies credentials. Keep provider keys in the restricted environment file.
 - Run `python3.11 scripts/setup_legacy_algorithms.py` for the preprocessing dependencies and public F2P checkpoint. Supply the compatible AirNet checkpoint from approved server storage and export `RAMANCLOUD_AIRNET_MODEL` pointing to it for the installer. Confirm F2P and AirNet availability and real inference before offering them to users.
 - For library matching, provision the approved PeakNet package privately and pass its path to `python3.11 scripts/setup_peaknet.py /path/to/peaknet-package.zip`. For Spectrum to Structure, run `python3.11 scripts/setup_vib2mol.py` and verify generation with a reference input. The installers use the manifest and pinned checksums where available. When provisioning more than one runtime, install PeakNet and Vib2Mol before the preprocessing runtime and verify all of them together. Optional agent assets require separate approved provisioning.

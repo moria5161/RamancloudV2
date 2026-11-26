@@ -90,6 +90,42 @@ class QaActionCases:
             return self.call(route, raw=urlencode(dict(payload=json.dumps(payload))).encode(),
                              content_type='application/x-www-form-urlencoded')
 
+    def test_streamed_preprocessing_keeps_its_uploaded_spectrum_open(self):
+        payload = dict(module='ai-analysis', mode='custom', goal='使用 Savitzky-Golay 降噪', allow_ai=True,
+                       context_key='stream-attachment', inputs={})
+        code, body = self.format_upload('/api/qa-assistant/preprocessing-turn?stream=true', 'stream-spectrum.txt',
+                                        self.spectrum_bytes(), fields=dict(payload=json.dumps(payload)), file_field='spectrum')
+        self.assertEqual(code, 200)
+        event = json.loads(body.decode().splitlines()[-1])
+        self.assertEqual(event['type'], 'result', event)
+        self.assertEqual(event['data']['kind'], 'plan', event)
+
+    def test_streamed_hyperspectral_processing_reports_waiting_and_returns_result(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from compute_queue import COMPUTE_QUEUE
+
+        wave = list(range(400, 432))
+        payload = dict(wavenumber=wave, spectra=[wave, wave], shape=[2, len(wave)], mode='series', steps=[])
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            with COMPUTE_QUEUE.reserve() as active:
+                active.acquire(timeout=0)
+                response = worker.submit(self.call, '/api/process-hyperspectral?stream=true', payload)
+                for _ in range(100):
+                    with COMPUTE_QUEUE.changed:
+                        if COMPUTE_QUEUE.waiting:
+                            break
+                    time.sleep(.02)
+                else:
+                    self.fail('The hyperspectral request did not enter the shared queue.')
+                self.assertFalse(response.done())
+                self.assertEqual(self.call('/api/health')[0], 200)
+            code, body = response.result(timeout=10)
+        self.assertEqual(code, 200)
+        events = [json.loads(line) for line in body.decode().splitlines()]
+        self.assertIn(dict(type='queued', ahead=1), events)
+        self.assertEqual(events[-1]['type'], 'result', events)
+        self.assertEqual(events[-1]['data']['code'], 0)
+
     def test_direct_turn_recognizes_attachment_reference_and_executes_all_after_confirmation(self):
         tasks_before = self.call('/api/ai-workflows')[1]
         model = dict(kind='plan', changes=[dict(type='despike')])

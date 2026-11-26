@@ -15,6 +15,7 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from compute_queue import COMPUTE_QUEUE, ComputeCancelled, ComputeQueueError
 from ssnet_contract import ACTIVE, PYTHON, ROOT, align, prepare_standards, runtime_ready
 from module_records import ModuleRecords
 
@@ -113,8 +114,9 @@ def install_ssnet(app, h):
     @app.on_event('shutdown')
     def shutdown():
         with gate:
-            for event in events.values():
+            for event, ticket in events.values():
                 event.set()
+                ticket.cancel_pending()
         pool.shutdown(wait=True, **({'cancel_futures': True} if sys.version_info >= (3, 9) else {}))
 
     def decode(row, detail=True):
@@ -183,7 +185,18 @@ def install_ssnet(app, h):
                     network_sha256=model['result'].get('network_sha256'),
                     artifacts=model['result']['artifacts'], projects=sorted(set(projects + model['input']['projects'])))
 
-    def run(job_id, user, cancel):
+    def run(job_id, user, cancel, ticket):
+        try:
+            with ticket:
+                ticket.acquire(cancelled=cancel)
+                run_job(job_id, user, cancel)
+        except ComputeCancelled:
+            pass
+        finally:
+            with gate:
+                events.pop(job_id, None)
+
+    def run_job(job_id, user, cancel):
         directory = folder / job_id
         try:
             with gate:
@@ -225,10 +238,6 @@ def install_ssnet(app, h):
             with db() as conn:
                 conn.execute("UPDATE ssnet_jobs SET status='failed',error=?,updated_at=? WHERE id=? AND status IN ('queued','running')",
                              (str(exc.detail if isinstance(exc, HTTPException) else exc)[:500], now(), job_id))
-        finally:
-            with gate:
-                events.pop(job_id, None)
-
     def create(kind, name, value, user):
         if not runtime_ready():
             raise HTTPException(503, '本地模型环境未安装，请按 MIXTURE_ANALYSIS.md 准备环境。')
@@ -238,13 +247,23 @@ def install_ssnet(app, h):
                 n = conn.execute("SELECT COUNT(*) AS n FROM ssnet_jobs WHERE status IN ('queued','running')").fetchone()['n']
                 if n >= 3:
                     raise HTTPException(429, '本地 SSnet 队列已满，请等待或停止已有任务。')
-                conn.execute('''INSERT INTO ssnet_jobs (id,user_id,kind,name,status,input_json,result_json,progress_json,error,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (job_id,user['id'],kind,name,'queued',encode(value),'{}',encode(dict(percent=0,stage='queued')),'',now(),now()))
-            events[job_id] = cancel
             try:
-                pool.submit(run, job_id, dict(user), cancel)
+                ticket = COMPUTE_QUEUE.reserve()
+            except ComputeQueueError as exc:
+                raise HTTPException(429, str(exc)) from exc
+            try:
+                with db() as conn:
+                    conn.execute('''INSERT INTO ssnet_jobs (id,user_id,kind,name,status,input_json,result_json,progress_json,error,created_at,updated_at)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (job_id,user['id'],kind,name,'queued',encode(value),'{}',encode(dict(percent=0,stage='queued')),'',now(),now()))
+            except Exception:
+                ticket.cancel_pending()
+                raise
+            events[job_id] = (cancel, ticket)
+            try:
+                pool.submit(run, job_id, dict(user), cancel, ticket)
             except RuntimeError as exc:
                 events.pop(job_id, None)
+                ticket.cancel_pending()
                 with db() as conn:
                     conn.execute("UPDATE ssnet_jobs SET status='failed',error=? WHERE id=?", ('本地执行服务已关闭。', job_id))
                 raise HTTPException(503, '本地执行服务已关闭。') from exc
@@ -301,7 +320,9 @@ def install_ssnet(app, h):
                 if row['status'] not in ACTIVE:
                     raise HTTPException(409, '该任务已经结束。')
                 if job_id in events:
-                    events[job_id].set()
+                    event, ticket = events[job_id]
+                    event.set()
+                    ticket.cancel_pending()
                 conn.execute("UPDATE ssnet_jobs SET status='cancelled',updated_at=? WHERE id=?", (now(), job_id))
             return get(job_id, user)
 

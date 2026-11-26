@@ -13,6 +13,7 @@ import { SPECTRAL_ACCEPT } from './ImportReport';
 import QAPlanCard from './QAPlanCard';
 import { checkPlanContext, executeQAPlan, executionInput, executionKey } from './qaExecution';
 import {addPlanToTimeline,updateTimelinePlan,chatHistory} from './qaTimeline';
+import { queuedRequest, queueStatus, readNDJSON } from '../queuedRequest';
 
 const ACCEPT = SPECTRAL_ACCEPT;
 const RUNNING = ['queued', 'running', 'stopping'];
@@ -175,8 +176,10 @@ export default function GlobalQAAssistant({ enabled }) {
         allow_ai: allowAI, context_key, inputs: context.inputs,
         parent_plan_id: plan?.context_key === context_key ? plan.id : undefined }));
       if (spectrum) form.append('spectrum', spectrum);
-      const { data } = await axios.post(BASE + '/qa-assistant/preprocessing-turn', form,
-        { headers, signal: abort.signal, timeout: 60000 });
+      const data = await queuedRequest(BASE + '/qa-assistant/preprocessing-turn',
+        { headers, body: form, signal: abort.signal }, event => {
+          if (current()) setPhase(event.type === 'queued' ? queueStatus(event.ahead) : localize('正在识别所需的预处理步骤…'));
+        });
       if (!current()) return;
       if (data.kind === 'clarification') {
         setMessages(previous => [...previous, { role: 'assistant', content: data.answer, clarification: true, preprocessing: !preset }]);
@@ -194,7 +197,7 @@ export default function GlobalQAAssistant({ enabled }) {
       setPlan(draft);
       setMessages(previous => addPlanToTimeline(previous, draft));
     } catch (err) {
-      if (current() && !axios.isCancel(err)) {
+      if (current() && err.name !== 'AbortError' && !axios.isCancel(err)) {
         if (!preset) setInput(text);
         if (draft) {
           setPlan(draft);
@@ -241,23 +244,16 @@ export default function GlobalQAAssistant({ enabled }) {
           sources: answer.sources, warnings: answer.warnings, evidence: answer.evidence } : m));
         return;
       }
-      const reader = response.body.getReader(), decoder = new TextDecoder(); let buffer = '', complete = false, received = false;
+      let complete = false, received = false;
       const update = changes => { if (version === epoch.current && mounted.current) setMessages(previous => previous.map(m => m.id === replyId ? { ...m, ...changes, content: changes.delta !== undefined ? m.content + changes.delta : m.content } : m)); };
-      function event(line) {
-        if (!line.trim()) return;
-        const item = JSON.parse(line);
-        if (item.type === 'error') throw new Error(item.message);
+      await readNDJSON(response, item => {
         if (item.type === 'status') setPhase(item.message);
+        if (item.type === 'queued') setPhase(queueStatus(item.ahead));
+        if (item.type === 'running') setPhase(localize('正在生成回答'));
         if (item.type === 'metadata') update({ provider: item.provider, model: item.model, warnings: item.warnings, evidence: item.evidence, sources: item.sources, summary: item.attachment_summary });
         if (item.type === 'delta') { received = true; update({ delta: item.text }); setPhase(localize("正在输出回答…")); }
         if (item.type === 'done') { complete = true; update({ incomplete: !!item.truncated, truncated: !!item.truncated }); }
-      }
-      try { while (true) {
-        const chunk = await reader.read(); if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true });
-        let end; while ((end = buffer.indexOf('\n')) >= 0) { event(buffer.slice(0, end)); buffer = buffer.slice(end+1); }
-      } buffer += decoder.decode(); if (buffer.trim()) event(buffer);
-      } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+      });
       if (!complete || !received) throw new Error(localize("回答不完整，请重试。"));
       if (version !== epoch.current || !mounted.current) return;
     } catch (err) {

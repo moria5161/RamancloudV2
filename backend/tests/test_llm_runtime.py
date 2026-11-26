@@ -8,6 +8,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import qa_stream
 import llm_runtime
+from compute_queue import COMPUTE_QUEUE, ComputeCancelled, ComputeQueue, ComputeQueueError
 
 SETTINGS = dict(provider='ollama', model='qwen3:test', base_url='http://127.0.0.1:11434')
 
@@ -36,8 +37,8 @@ class ModelTransportTests(unittest.TestCase):
         self.assertEqual(payload['keep_alive'], '15m')
         self.assertEqual(payload['options']['num_predict'], 650)
         self.assertFalse(payload['think'])
-        self.assertTrue(llm_runtime._LOCAL.acquire(blocking=False))
-        llm_runtime._LOCAL.release()
+        with COMPUTE_QUEUE.reserve() as ticket:
+            ticket.acquire(timeout=0)
 
     def test_network_eof_stays_an_error_and_detailed_request_keeps_larger_budget(self):
         with patch.object(qa_stream, 'urlopen', return_value=self.response(dict(message=dict(content='一部分')))) as upstream:
@@ -59,5 +60,24 @@ class ModelTransportTests(unittest.TestCase):
     def test_local_inference_lock_releases_after_failure(self):
         with self.assertRaises(ValueError):
             with llm_runtime.inference_slot(SETTINGS): raise ValueError('test')
-        self.assertTrue(llm_runtime._LOCAL.acquire(blocking=False))
-        llm_runtime._LOCAL.release()
+        with COMPUTE_QUEUE.reserve() as ticket:
+            ticket.acquire(timeout=0)
+
+    def test_shared_queue_preserves_reservations_and_skips_cancelled_requests(self):
+        queue = ComputeQueue(capacity=4)
+        with queue.reserve() as active:
+            active.acquire(timeout=0)
+            ssnet = queue.reserve()
+            withdrawn = queue.reserve()
+            qa = queue.reserve()
+            with self.assertRaises(ComputeQueueError):
+                queue.reserve()
+            withdrawn.cancel_pending()
+        with withdrawn, self.assertRaises(ComputeCancelled):
+            withdrawn.acquire()
+        with qa:
+            with ssnet:
+                with self.assertRaises(ComputeQueueError):
+                    qa.acquire(timeout=0)
+                ssnet.acquire(timeout=0)
+            qa.acquire(timeout=0)

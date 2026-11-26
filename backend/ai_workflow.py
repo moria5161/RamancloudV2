@@ -26,7 +26,7 @@ from workflow_review import DEFAULT_PREPROCESS_GOAL, checked_region, scoped_step
 from ai_batch import install_ai_batches, MAX_BATCH_FILES, MAX_BATCH_BYTES
 from spectral_formats import standard_spectrum_content
 from preprocessing.despike import DEFAULT_PARAMS as DESPIKE_DEFAULTS, validate_order as validate_despike_order
-from llm_runtime import inference_slot
+from llm_runtime import inference_slot, ollama_context_length
 import legacy_algorithms
 
 LOG = logging.getLogger(__name__)
@@ -399,7 +399,7 @@ def call_chat_completion(settings, messages, json_mode=False, max_tokens=3000, t
 def _call_chat_completion(settings, messages, json_mode=False, max_tokens=3000, timeout=45, output_schema=None):
     if settings.get("provider") == "ollama":
         payload = dict(model=settings["model"], messages=messages, stream=json_mode, keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", "15m"),
-                       options=dict(temperature=0.2, num_ctx=8192, num_predict=max_tokens))
+                       options=dict(temperature=0.2, num_ctx=ollama_context_length(), num_predict=max_tokens))
         if settings["model"].lower().startswith("qwen3:") and "instruct" not in settings["model"].lower():
             payload["think"] = False
             payload["messages"] = [dict(message) for message in messages]

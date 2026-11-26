@@ -1,8 +1,8 @@
 """Shared local inference budget; no prompts, credentials or spectra in logs."""
-import threading
+import os
 from contextlib import contextmanager
 
-_LOCAL = threading.BoundedSemaphore(1)
+from compute_queue import ComputeQueueError, compute_slot
 AXIS_POLICY = '平台约定：未声明横轴单位时默认按拉曼位移 cm⁻¹ 处理，这是默认假定而非文件已声明。不要因未声明单位反复追问、拒绝生成方案或声称所有分析无效。历史对话中的单位追问不覆盖本约定。明确声明为波长、像素、能量或其他单位时不能直接当作拉曼位移，需遵守导入检查和转换要求。'
 
 
@@ -24,21 +24,22 @@ def axis_reference(value):
     return value
 
 
-class ModelBusyError(RuntimeError):
+class ModelBusyError(ComputeQueueError):
     pass
 
 
 @contextmanager
 def inference_slot(settings):
-    local = settings.get('provider') == 'ollama'
-    acquired = not local or _LOCAL.acquire(timeout=15)
-    if not acquired:
-        raise ModelBusyError('本地模型正在处理其他请求，请稍后重试。')
     try:
-        yield
-    finally:
-        if local:
-            _LOCAL.release()
+        with compute_slot():
+            yield
+    except ComputeQueueError as exc:
+        raise ModelBusyError(str(exc)) from exc
+
+
+def ollama_context_length():
+    value = os.getenv('RAMANCLOUD_OLLAMA_CONTEXT', '4096')
+    return min(32768, max(2048, int(value))) if value.isdecimal() and len(value) <= 5 else 4096
 
 
 def compact_reference(value, depth=0):

@@ -15,7 +15,7 @@ from urllib.error import URLError
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 from fastapi import Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from compute_queue import ComputeCancelled, stream_cancelled, stream_work
 from qa_context import install_context, task_evidence, record_evidence
 from qa_stream import tokens, ResponseTruncated
 from llm_runtime import ModelBusyError, compact_reference, axis_reference, AXIS_POLICY
@@ -183,9 +183,8 @@ def install_qa_assistant(app, h):
         if not allow_ai:
             return dict(answer='请先开启“允许调用大模型”，再发送问题。附件已校验，但未发送给模型。',
                         provider='disabled', model='', warnings=notices, attachment_summary=attachments)
-        if not _SLOTS.acquire(blocking=False):
+        if not stream and not _SLOTS.acquire(blocking=False):
             raise HTTPException(429, '问答助手繁忙，请稍后重试。')
-        stream_owns_slot = False
         try:
             settings = dict(workflow.config())
             if image:
@@ -222,36 +221,34 @@ def install_qa_assistant(app, h):
             if image:
                 current['images'] = [image]
             if stream:
-                def events():
-                    def event(**data):
-                        return json.dumps(data, ensure_ascii=False, allow_nan=False) + '\n'
+                def events(emit):
                     started = time.monotonic()
+                    chunks = tokens(settings, [dict(role='system', content=SYSTEM)] + previous + [current])
                     try:
-                        yield event(type='status', message='已读取数据，正在生成回答' if evidence_task or attachments else '正在生成回答')
-                        yield event(type='metadata', provider=settings.get('provider'), model=settings.get('model'),
-                                    warnings=notices, sources=sources,
-                                    evidence=evidence_task, attachment_summary=attachments)
+                        emit(type='metadata', provider=settings.get('provider'), model=settings.get('model'),
+                             warnings=notices, sources=sources, evidence=evidence_task, attachment_summary=attachments)
                         if notices:
-                            yield event(type='delta', text='说明：截图未被模型查看。\n\n')
-                        for chunk in tokens(settings, [dict(role='system', content=SYSTEM)] + previous + [current]):
-                            yield event(type='delta', text=chunk)
-                        yield event(type='done')
+                            emit(type='delta', text='说明：截图未被模型查看。\n\n')
+                        for chunk in chunks:
+                            if stream_cancelled():
+                                return
+                            emit(type='delta', text=chunk)
+                        emit(type='done')
                     except ResponseTruncated:
-                        yield event(type='done', truncated=True)
-                    except ModelBusyError:
-                        yield event(type='error', message='本地模型正在处理其他请求，请稍后重试；已生成文字保留。')
+                        emit(type='done', truncated=True)
+                    except (ModelBusyError, ComputeCancelled):
+                        raise
                     except (TimeoutError, socket.timeout):
-                        yield event(type='error', message='本地模型响应超时，已生成文字保留，可缩短问题后重试。')
+                        emit(type='error', message='本地模型响应超时，已生成文字保留，可缩短问题后重试。')
                     except URLError:
-                        yield event(type='error', message='模型连接断开，请检查 Ollama 是否正在运行；已生成文字保留。')
+                        emit(type='error', message='模型连接断开，请检查 Ollama 是否正在运行；已生成文字保留。')
                     except Exception as exc:
                         LOG.warning('QA stream failed: category=%s elapsed=%.1fs', type(exc).__name__, time.monotonic()-started)
-                        yield event(type='error', message='模型未正常完成回答，已生成文字保留，请重试。')
+                        emit(type='error', message='模型未正常完成回答，已生成文字保留，请重试。')
                     finally:
-                        _SLOTS.release()
-                stream_owns_slot = True
-                return StreamingResponse(events(), media_type='application/x-ndjson',
-                                         headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
+                        if hasattr(chunks, 'close'):
+                            chunks.close()
+                return stream_work(events, '模型未正常完成回答，已生成文字保留，请重试。')
             answer = workflow.call_chat_completion(settings, [dict(role='system', content=SYSTEM)] + previous + [current],
                                                    max_tokens=1800, timeout=45)
             if not isinstance(answer, str) or not answer.strip():
@@ -265,5 +262,5 @@ def install_qa_assistant(app, h):
             # Never expose backend URLs, credentials or upstream error bodies.
             raise HTTPException(503, '大模型暂时不可用，请检查模型服务、模型名称和配置后重试；未生成替代专业结论。')
         finally:
-            if not stream_owns_slot:
+            if not stream:
                 _SLOTS.release()

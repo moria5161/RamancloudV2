@@ -15,6 +15,7 @@ import usePlotHeight from '../components/usePlotHeight';
 import axiosClient from 'axios';
 import { apiErrorMessage, useAuth } from '../auth';
 import { usePreferences } from '../i18n';
+import { queuedRequest, queueStatus } from '../queuedRequest';
 
 
 const DEMOS = ['imaging_horiba', 'timeseries_horiba'];
@@ -39,6 +40,7 @@ export default function HyperspectralProcessing() {
   const [processedMean, setProcessedMean] = useState(null);
   const [steps, setSteps] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [computeStatus, setComputeStatus] = useState(null);
   const [error, setError] = useState(null);
   const [cutRange, setCutRange] = useState(null);
   const [activeTab, setActiveTab] = useState('imaging');
@@ -193,7 +195,7 @@ export default function HyperspectralProcessing() {
     try {
       const pipelineSteps = pipeline.map(s => ({ type: s.type, method: s.method, params: s.params }));
 
-      const { data: res } = await axios.post(`${API_BASE}/process-hyperspectral`, {
+      const payload = {
         wavenumber: rawData.wavenumber,
         dataset_id: rawData.dataset_id,
         spectra: rawData.spectra,
@@ -204,7 +206,11 @@ export default function HyperspectralProcessing() {
         preview_wavenumber: selectedWN,
         source_name: fileName || rawData.filename || 'hyperspectral',
         title: `${fileName || rawData.filename || 'Hyperspectral'} analysis`,
-      });
+      };
+      const res = await queuedRequest(`${API_BASE}/process-hyperspectral`, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      }, setComputeStatus);
 
       if (res.code === 0) {
         setProcessedMean({ wavenumber: res.data.wavenumber, intensity: res.data.mean_spectrum });
@@ -230,9 +236,10 @@ export default function HyperspectralProcessing() {
       showError(apiErrorMessage(e, e.response ? '高光谱处理失败。' : e.message || '高光谱处理失败。'));
       throw e;
     } finally {
+      setComputeStatus(null);
       setIsProcessing(false);
     }
-  }, [axios, rawData, fileName, selectedWN, fetchSlice]);
+  }, [token, rawData, fileName, selectedWN, fetchSlice]);
 
   const handleProcess = useCallback(async () => {
     try { await processWithSteps(steps); } catch { /* The workspace already shows the error. */ }
@@ -646,6 +653,9 @@ export default function HyperspectralProcessing() {
         />
 
           </div>
+        {computeStatus && <p role="status" className="form-text">
+          {computeStatus.type === 'queued' ? queueStatus(computeStatus.ahead) : localize('正在运行高光谱处理…')}
+        </p>}
         <ControlPanel horizontal actionsOnly
           steps={steps} onStepsChange={setSteps}
           onProcess={handleProcess} onDownload={handleDownload} onReset={handleReset}

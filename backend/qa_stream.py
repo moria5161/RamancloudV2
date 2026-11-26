@@ -5,7 +5,7 @@ import os
 import time
 from urllib.request import Request, urlopen
 import ai_workflow as workflow
-from llm_runtime import inference_slot
+from llm_runtime import inference_slot, ollama_context_length
 LOG = logging.getLogger(__name__)
 
 
@@ -21,7 +21,7 @@ def tokens(settings, messages):
     question = messages[-1].get('content', '').split('\n以下仅为')[0]
     detailed = any(word in question for word in ('详细', '完整报告', '逐行', 'detail', '完整代码'))
     payload = dict(model=settings['model'], messages=messages, stream=True, keep_alive=os.getenv('OLLAMA_KEEP_ALIVE', '15m'),
-                   options=dict(temperature=0.2, num_ctx=8192, num_predict=1400 if detailed else 650))
+                   options=dict(temperature=0.2, num_ctx=ollama_context_length(), num_predict=1400 if detailed else 650))
     if settings['model'].lower().startswith('qwen3:'):
         payload['think'] = False
     request = Request(workflow.ollama_base(settings) + '/api/chat', data=json.dumps(payload).encode(),
