@@ -142,6 +142,7 @@ class SSnetCases:
                 second_code, second = self.call('/api/ssnet/train', dict(payload, name='Second reference'))
                 self.assertEqual(second_code, 200, second)
                 self.assertEqual(second['status'], 'queued')
+                self.assertEqual(self.call('/api/ssnet/jobs/'+second['id'])[1]['queue_position'], 1)
                 hyper = requests.submit(self.call, '/api/process-hyperspectral?stream=true', cube)
                 chat = requests.submit(reply)
                 for future, end in ((hyper, 'result'), (chat, 'done')):
@@ -175,6 +176,47 @@ class SSnetCases:
             value=self.call('/api/ssnet/jobs/'+job['id'])[1]
             self.assertEqual(value['status'],'cancelled')
             self.assertEqual(value['result'],{})
+        self.assertEqual(self.request('/api/ssnet/jobs/'+job['id']+'/retry', {}, token=self.other['token'])[0], 404)
+        training = dict(artifacts={}, loss_history=[.1])
+        with patch.object(ssnet, 'execute_local', return_value=training) as worker:
+            endpoint = '/api/ssnet/jobs/'+job['id']+'/retry'
+            code, queued = self.call(endpoint, {})
+            self.assertEqual(code, 200, queued)
+            self.assertNotEqual(queued['id'], job['id'])
+            self.assertEqual(self.call(endpoint, {})[1]['id'], queued['id'])
+            self.assertEqual(self.wait_ssnet(queued['id'])['status'], 'completed')
+            self.assertEqual(worker.call_count, 1)
+            self.assertEqual(worker.call_args.args[1]['input'], value['input'])
+
+        # This completion is visible even if the client did not watch the worker.
+        completion_id = queued['id']
+        self.assertIn(completion_id, [item['id'] for item in self.call('/api/ssnet/completions')[1]])
+        endpoint = '/api/ssnet/jobs/'+completion_id+'/seen'
+        self.assertNotIn(completion_id, [item['id'] for item in self.request('/api/ssnet/completions', token=self.other['token'])[1]])
+        self.assertEqual(self.request(endpoint, {}, token=self.other['token'])[0], 404)
+        self.assertEqual(self.call(endpoint, {})[0], 200)
+        self.assertNotIn(completion_id, [item['id'] for item in self.call('/api/ssnet/completions')[1]])
+
+    def test_ssnet_queued_jobs_are_reloaded_in_order_on_startup(self):
+        _, payload = self.ssnet_training()
+        training = dict(artifacts={}, loss_history=[.1])
+        with patch.object(ssnet, 'execute_local', return_value=training):
+            initial = self.call('/api/ssnet/train', payload)[1]
+            self.assertEqual(self.wait_ssnet(initial['id'])['status'], 'completed')
+        job_ids = ('recover-earlier', 'recover-later', 'recover-interrupted')
+        with backend.db_connect() as conn:
+            for job_id, date, status in zip(job_ids, ('2026-01-01', '2026-01-02', '2026-01-03'), ('queued', 'queued', 'running')):
+                conn.execute('''INSERT INTO ssnet_jobs (id,user_id,kind,name,status,input_json,result_json,progress_json,error,created_at,updated_at)
+                    SELECT ?,user_id,kind,name,?,input_json,'{}','{}','',?,? FROM ssnet_jobs WHERE id=?''',
+                    (job_id, status, date, date, initial['id']))
+        recover = next(callback for callback in backend.app.router.on_startup
+                       if callback.__module__ == 'ssnet' and callback.__name__ == 'recover')
+        with patch.object(ssnet, 'execute_local', return_value=training) as worker:
+            recover()
+            self.assertEqual(self.wait_ssnet(job_ids[0])['status'], 'completed')
+            self.assertEqual(self.wait_ssnet(job_ids[1])['status'], 'completed')
+            self.assertEqual(self.wait_ssnet(job_ids[2])['status'], 'failed')
+            self.assertEqual([call.args[0].name for call in worker.call_args_list], list(job_ids[:2]))
 
     def test_ssnet_project_revocation_hides_trained_model(self):
         import app as backend

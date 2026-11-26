@@ -103,12 +103,20 @@ def install_ssnet(app, h):
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) {h['TABLE_OPTIONS']}''')
         h['create_index'](conn, 'idx_ssnet_owner', 'ssnet_jobs', 'user_id')
+        conn.execute(f'''CREATE TABLE IF NOT EXISTS ssnet_completions (
+            job_id {h['ID_SQL']} PRIMARY KEY, read_at {h['DATE_SQL']},
+            FOREIGN KEY (job_id) REFERENCES ssnet_jobs(id) ON DELETE CASCADE
+        ) {h['TABLE_OPTIONS']}''')
 
     @app.on_event('startup')
     def recover():
         with db() as conn:
-            conn.execute("UPDATE ssnet_jobs SET status='failed',error=?,updated_at=? WHERE status IN ('queued','running')",
-                         ('服务重启，任务中断。已完成的模型仍可复用，请重新提交未完成任务。', now()))
+            conn.execute("UPDATE ssnet_jobs SET status='failed',error=?,updated_at=? WHERE status='running'",
+                         ('服务重启时任务中断。可使用原数据和参数重新排队。', now()))
+            queued = conn.execute("SELECT id,user_id FROM ssnet_jobs WHERE status='queued' ORDER BY created_at,id").fetchall()
+        with gate:
+            for job in queued:
+                enqueue(job['id'], job['user_id'])
 
     @app.on_event('shutdown')
     def shutdown():
@@ -187,14 +195,20 @@ def install_ssnet(app, h):
                     network_sha256=model['result'].get('network_sha256'),
                     artifacts=model['result']['artifacts'], projects=sorted(set(projects + model['input']['projects'])))
 
-    def run(job_id, user, cancel):
+    def run(job_id, user_id, cancel):
         directory = folder / job_id
         try:
             with gate:
                 if cancel.is_set():
                     return
                 with db() as conn:
+                    account = conn.execute('SELECT * FROM users WHERE id=? AND is_active=1', (user_id,)).fetchone()
+                    if account is None:
+                        raise HTTPException(403, '账号已停用，任务未执行。')
+                    user = h['row_to_user'](account)
                     row = owned(conn, job_id, user)
+                    if row['status'] != 'queued':
+                        return
                     conn.execute("UPDATE ssnet_jobs SET status='running',updated_at=? WHERE id=? AND status='queued'", (now(), job_id))
             value = decode(row)
             request = dict(kind=value['kind'], input=value['input'])
@@ -225,6 +239,7 @@ def install_ssnet(app, h):
                     owned(conn, job_id, user)
                     conn.execute("UPDATE ssnet_jobs SET status='completed',result_json=?,progress_json=?,updated_at=? WHERE id=? AND status='running'",
                                  (encode(result), encode(dict(percent=100, stage='completed')), now(), job_id))
+                    conn.execute('INSERT INTO ssnet_completions (job_id) VALUES (?)', (job_id,))
         except Exception as exc:
             with db() as conn:
                 conn.execute("UPDATE ssnet_jobs SET status='failed',error=?,updated_at=? WHERE id=? AND status IN ('queued','running')",
@@ -233,32 +248,36 @@ def install_ssnet(app, h):
             with gate:
                 events.pop(job_id, None)
 
-    def create(kind, name, value, user):
+    def enqueue(job_id, user_id):
+        cancel = threading.Event()
+        events[job_id] = cancel
+        try:
+            pool.submit(run, job_id, user_id, cancel)
+        except RuntimeError as exc:
+            events.pop(job_id, None)
+            raise HTTPException(503, 'SSnet 服务正在关闭，请稍后重试。') from exc
+
+    def create(kind, name, value, user, *, retry_id=None):
         if not runtime_ready():
             raise HTTPException(503, '本地模型环境未安装，请按 MIXTURE_ANALYSIS.md 准备环境。')
-        job_id, cancel = uuid.uuid4().hex, threading.Event()
+        job_id = retry_id or uuid.uuid4().hex
         with gate:
             with db() as conn:
+                if retry_id and conn.execute('SELECT id FROM ssnet_jobs WHERE id=? AND user_id=?', (job_id, user['id'])).fetchone():
+                    return decode(owned(conn, job_id, user))
                 n = conn.execute("SELECT COUNT(*) AS n FROM ssnet_jobs WHERE status IN ('queued','running')").fetchone()['n']
                 if n >= 3:
                     raise HTTPException(429, '本地 SSnet 队列已满，请等待或停止已有任务。')
                 conn.execute('''INSERT INTO ssnet_jobs (id,user_id,kind,name,status,input_json,result_json,progress_json,error,created_at,updated_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (job_id,user['id'],kind,name,'queued',encode(value),'{}',encode(dict(percent=0,stage='queued')),'',now(),now()))
-            events[job_id] = cancel
-            try:
-                pool.submit(run, job_id, dict(user), cancel)
-            except RuntimeError as exc:
-                events.pop(job_id, None)
-                with db() as conn:
-                    conn.execute("UPDATE ssnet_jobs SET status='failed',error=? WHERE id=?", ('本地执行服务已关闭。', job_id))
-                raise HTTPException(503, '本地执行服务已关闭。') from exc
+            enqueue(job_id, user['id'])
         with db() as conn:
             return decode(owned(conn, job_id, user))
 
     @app.get('/api/ssnet/config')
     def config(user=Depends(auth)):
         return dict(ready=runtime_ready(), algorithm='SSnet · U-Net ECA + Random Forest', device=SSNET_DEVICE,
-                    message='CPU 模式。训练可在后台运行或停止，耗时取决于运行环境。')
+                    message='SSnet 任务按提交顺序在服务器处理。关闭网页后仍会继续。')
 
     @app.post('/api/ssnet/train/validate')
     def validate_train(payload: Training, user=Depends(auth)):
@@ -279,6 +298,21 @@ def install_ssnet(app, h):
         value = prediction_input(payload, user)
         return create('predict', value['source_names'][0], value, user)
 
+    @app.get('/api/ssnet/completions')
+    def completions(user=Depends(auth)):
+        with db() as conn:
+            rows = conn.execute('''SELECT j.id,j.kind,j.name FROM ssnet_jobs j JOIN ssnet_completions c ON c.job_id=j.id
+                WHERE j.user_id=? AND j.status='completed' AND c.read_at IS NULL ORDER BY j.updated_at DESC,j.id DESC''',
+                (user['id'],)).fetchall()
+            visible = []
+            for row in rows:
+                try:
+                    owned(conn, row['id'], user)
+                except HTTPException:
+                    continue
+                visible.append(dict(row))
+            return visible
+
     @app.get('/api/ssnet/jobs')
     def jobs(user=Depends(auth)):
         with db() as conn:
@@ -295,7 +329,37 @@ def install_ssnet(app, h):
     @app.get('/api/ssnet/jobs/{job_id}')
     def get(job_id: str, user=Depends(auth)):
         with db() as conn:
-            return decode(owned(conn, job_id, user))
+            value = decode(owned(conn, job_id, user))
+            if value['status'] == 'queued':
+                ahead = conn.execute("""SELECT COUNT(*) AS n FROM ssnet_jobs WHERE status='queued'
+                    AND (created_at<? OR (created_at=? AND id<?))""", (value['created_at'], value['created_at'], job_id)).fetchone()['n']
+                value['queue_position'] = ahead + 1
+            return value
+
+    @app.post('/api/ssnet/jobs/{job_id}/seen')
+    def seen(job_id: str, user=Depends(auth)):
+        with db() as conn:
+            owned(conn, job_id, user)
+            conn.execute('UPDATE ssnet_completions SET read_at=? WHERE job_id=? AND read_at IS NULL', (now(), job_id))
+        return {'seen': True}
+
+    @app.post('/api/ssnet/jobs/{job_id}/retry')
+    def retry(job_id: str, user=Depends(auth)):
+        with db() as conn:
+            original = owned(conn, job_id, user)
+            if original['status'] not in ('cancelled', 'failed'):
+                raise HTTPException(409, '只有已取消或失败的任务可以重新排队。')
+            value = decode(original)
+            inputs = value['input']
+            if value['kind'] == 'train' and SSNET_DEVICE == 'cuda':
+                inputs['settings']['device'] = SSNET_DEVICE
+            if value['kind'] == 'predict':
+                model = owned(conn, inputs['model_id'], user)
+                if model['status'] != 'completed':
+                    raise HTTPException(400, '原标准品模型已不可用，请重新选择。')
+                inputs['device'] = SSNET_DEVICE
+        retry_id = uuid.uuid5(uuid.NAMESPACE_URL, f'ramancloud.ssnet.retry/{job_id}').hex
+        return create(value['kind'], value['name'], inputs, user, retry_id=retry_id)
 
     @app.post('/api/ssnet/jobs/{job_id}/cancel')
     def cancel(job_id: str, user=Depends(auth)):

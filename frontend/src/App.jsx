@@ -21,6 +21,7 @@ import StructureGenerationPage from './pages/StructureGenerationPage';
 import MixtureAnalysisPage from './pages/MixtureAnalysisPage';
 import FeedbackPage from './pages/FeedbackPage';
 import AnalysisWorkspaces from './components/AnalysisWorkspaces';
+import SSnetCompletionNotice from './components/SSnetCompletionNotice';
 
 const ANALYSIS_PAGES = {'/ai-analysis':AIAnalysisPage,'/hyperspectral':HyperspectralProcessing,'/peak-fitting':PeakFittingPage,
   '/spectral-unmixing':MixtureAnalysisPage,'/library-matching':LibraryMatchingPage,'/structure-generation':StructureGenerationPage};
@@ -60,8 +61,9 @@ function AppShell() {
         <div className="welcome-title">{language === 'zh' ? '欢迎使用 RamanCloud' : 'Welcome to RamanCloud'}</div>
       </div>
       <Sidebar />
-      <main data-qa-workspace className="flex-1 min-w-0 overflow-hidden">
-        <div className="route-surface h-full overflow-hidden">
+      <main data-qa-workspace className="flex flex-1 min-w-0 flex-col overflow-hidden">
+        <SSnetCompletionNotice key={user.id} />
+        <div className="route-surface min-h-0 flex-1 overflow-hidden">
           <AnalysisWorkspaces key={user.id} pages={ANALYSIS_PAGES}>
           <Routes>
             <Route path="/" element={<HomePage />} />

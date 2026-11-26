@@ -68,7 +68,7 @@ export default function Tutorial() {
     ],
     [
       ['为什么第一次运行或本机 AI 会等很久？', 'Why can a first run or local AI take a long time?'],
-      ['首次运行需加载权重，速度也受硬件和输入长度影响。SSnet 训练可在标准品模型记录中查看进度；AI 回答较长时可停止或继续回答。', 'First runs load weights; hardware and input length affect speed. Follow SSnet training in Standard model records. You can stop AI generation or continue a truncated answer.'],
+      ['首次运行需加载权重，速度也受硬件和输入长度影响。在“SSnet 任务记录”查看进度，关掉网页后任务仍会继续，回来时可查看完成提醒。AI 回答较长时可停止或继续回答。', 'First runs load weights. Hardware and input length affect speed. Follow progress in SSnet tasks. Closing the site leaves the task running, and the completion reminder appears when you return. You can stop AI generation or continue a truncated answer.'],
     ],
     [
       ['保存结果后，其他项目成员就能看到了吗？', 'Are saved results automatically shared with project members?'],

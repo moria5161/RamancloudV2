@@ -2,7 +2,8 @@ import { API_BASE as BASE } from '../apiBase';
 import { systemText, getLocale, localize } from '../locale.js';
 import { useQAExecutionInput } from '../components/qaExecution';
 import MixtureResult from '../components/MixtureResult';
-import {NewAnalysisButton,useWorkspaceList} from '../components/AnalysisWorkspaces';
+import {NewAnalysisButton,useAnalysisWorkspace,useWorkspaceList} from '../components/AnalysisWorkspaces';
+import { SSNET_COMPLETION_VIEWED } from '../components/SSnetCompletionNotice';
 import { FileExport } from '../components/ResultActions';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
@@ -71,6 +72,7 @@ function SpectrumPicker({ api, txt, tasks, title, onSelect, disabled, onError, o
 
 export default function MixtureAnalysisPage() {
   const { token } = useAuth(), { language, theme } = usePreferences();
+  const { active: workspaceActive } = useAnalysisWorkspace();
   const txt = (zh, en) => language === 'zh' ? zh : en;
   const api = useMemo(() => axios.create({ baseURL: BASE, headers: { Authorization: `Bearer ${token}` }, timeout: 30000 }), [token]);
   const [search, setSearch] = useSearchParams();
@@ -81,13 +83,12 @@ export default function MixtureAnalysisPage() {
   const [prepared, setPrepared] = useState(null), [validationError, setValidationError] = useState(''), [validating, setValidating] = useState(false);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [pickerBusy, setPickerBusy] = useState(false);
   const models = readyModels(jobs), band = commonBand(standards), requestedJob = search.get('job');
-  const trainingRecords = jobs.filter(record => record.kind === 'train' && record.status !== 'failed');
+  const taskRecords = jobs.filter(record => record.status !== 'failed' || record.id === requestedJob);
   const deviceLabel = config?.device === 'cuda' ? txt('GPU 加速', 'GPU acceleration') : config?.device === 'cpu' ? 'CPU' : '';
-  const failedTraining = job?.kind === 'train' && job.status === 'failed';
   const currentModel = models.find(m => m.id === modelId), active = activeTask(job), locked = busy || active || pickerBusy;
   const requestedWorkflow = search.get('workflow'), requestedVersion = search.get('version');
-  const statusText = status => ({ queued:txt('排队中','Queued'), running:txt('运行中','Running'), completed:txt('已完成','Completed'), failed:txt('失败','Failed'), cancelled:txt('已停止','Stopped') }[status] || status);
-  const stageText = stage => ({ queued:txt('等待本地算力','Waiting for local worker'), unet:txt('训练 U-Net','Training U-Net'), random_forest_samples:txt('生成随机森林样本','Generating RF samples'), random_forest_training:txt('训练随机森林','Training random forest'), saving:txt('保存模型','Saving model'), loading_model:txt('加载标准品模型','Loading model'), extracting:txt('提取目标成分','Extracting target'), completed:txt('已完成','Completed') }[stage] || txt('准备任务','Preparing task'));
+  const statusText = status => ({ queued:txt('排队中','Queued'), running:txt('运行中','Running'), completed:txt('已完成','Completed'), failed:txt('失败','Failed'), cancelled:txt('已取消','Cancelled') }[status] || status);
+  const stageText = stage => ({ queued:txt('等待服务器处理','Waiting for the server'), unet:txt('训练 U-Net','Training U-Net'), random_forest_samples:txt('生成随机森林样本','Generating RF samples'), random_forest_training:txt('训练随机森林','Training random forest'), saving:txt('保存模型','Saving model'), loading_model:txt('加载标准品模型','Loading model'), extracting:txt('提取目标成分','Extracting target'), completed:txt('已完成','Completed') }[stage] || txt('准备任务','Preparing task'));
 
   async function refresh() { const { data } = await api.get('/ssnet/jobs'); setJobs(data); return data; }
   useWorkspaceList(api,'/ai-workflows',setTasks,setError);
@@ -118,13 +119,22 @@ export default function MixtureAnalysisPage() {
     return () => { cancelled = true; };
   }, [requestedJob, api]);
   useEffect(() => {
-    if (!failedTraining || job.id !== requestedJob) return;
-    setError(job.error || txt('标准品模型训练失败。', 'Standard model training failed.'));
-    setJob(null);
-    const next = new URLSearchParams(search);
-    next.delete('job');
-    setSearch(next, {replace:true});
-  }, [failedTraining, job, requestedJob, search, setSearch, language]);
+    if (!workspaceActive || !job || job.id !== requestedJob || job.status !== 'completed') return;
+    let checking = false;
+    async function markViewed() {
+      if (document.hidden || checking) return;
+      checking = true;
+      try {
+        await api.post(`/ssnet/jobs/${requestedJob}/seen`);
+        window.dispatchEvent(new Event(SSNET_COMPLETION_VIEWED));
+      } catch {
+        checking = false;
+      }
+    }
+    markViewed();
+    document.addEventListener('visibilitychange', markViewed);
+    return () => document.removeEventListener('visibilitychange', markViewed);
+  }, [workspaceActive, job?.id, job?.status, requestedJob, api]);
   const pendingJobs = jobs.some(activeTask);
   useEffect(() => {
     if (!active && !pendingJobs) return;
@@ -167,9 +177,18 @@ export default function MixtureAnalysisPage() {
     finally { setBusy(false); }
   }
   async function cancel() {
+    if (!window.confirm(txt('取消这项任务？重新运行时会从头开始。', 'Cancel this task? A retry will start from the beginning.'))) return;
     setBusy(true); setError('');
     try { const {data} = await api.post(`/ssnet/jobs/${job.id}/cancel`,{}); setJob(data); await refresh(); }
     catch (err) { setError(apiErrorMessage(err)); }
+    finally { setBusy(false); }
+  }
+  async function retry() {
+    setBusy(true); setError('');
+    try {
+      const {data} = await api.post(`/ssnet/jobs/${job.id}/retry`);
+      setJob(data); setSearch({job:data.id},{replace:true}); await refresh();
+    } catch (err) { setError(apiErrorMessage(err)); }
     finally { setBusy(false); }
   }
   async function download(format) {
@@ -215,11 +234,33 @@ export default function MixtureAnalysisPage() {
       </section>
     </div><section className="sg-panel mx-results"><div className="sg-panel-heading"><h2><span>02</span>{txt('任务与解析结果','Tasks and results')}</h2><button className="mx-refresh" aria-label={txt('刷新 SSnet 记录','Refresh SSnet records')} disabled={busy} onClick={()=>refresh().catch(err=>setError(apiErrorMessage(err)))}><RefreshCw size={14}/></button></div>
       <SavedAnalysisRecords api={api} module="ssnet" job={job} txt={txt} disabled={locked} onError={setError} onOpen={id => setSearch({ job: id }, { replace: true })} />
-      {trainingRecords.length>0&&<label>{txt('标准品模型记录','Standard model records')}<select aria-label={txt('标准品模型记录','Standard model records')} value={job?.kind==='train'&&!failedTraining?job.id:''} onChange={e=>setSearch(e.target.value?{job:e.target.value}:{},{replace:true})}><option value="">{txt('选择标准品模型','Select a reference model')}</option>{trainingRecords.map(j=><option key={j.id} value={j.id}>{txt('训练','Train')} · {j.name} · {statusText(j.status)} · {j.id.slice(0,6)}</option>)}</select></label>}
-      {(!job||failedTraining)?<div className="sg-empty-results mx-empty"><div className="sg-empty-atom"><GitBranch size={53} strokeWidth={1.3}/></div><h3>{txt("暂无解析结果","No extraction results yet")}</h3><p>{txt("建立模型后，上传混合谱开始解析。","Train a model, then upload a mixture to start extraction.")}</p><div className="mx-result-legend"><span><i/>{txt('混合谱','Mixture')}</span><span><i/>{txt('目标提取谱','Extracted target')}</span><span><i/>{txt('估计背景','Estimated background')}</span></div><small>{txt('SSnet · U-Net ECA + Random Forest','SSnet · U-Net ECA + Random Forest')}</small></div>:<>
+      {taskRecords.length > 0 && <label>
+        {txt('SSnet 任务记录', 'SSnet tasks')}
+        <select value={requestedJob || ''} onChange={e=>setSearch(e.target.value?{job:e.target.value}:{},{replace:true})}>
+          <option value="">{txt('选择训练或解析任务', 'Select a training or extraction task')}</option>
+          {taskRecords.map(task => <option key={task.id} value={task.id}>
+            {task.kind === 'train' ? txt('训练', 'Training') : txt('解析', 'Extraction')} · {task.name} · {statusText(task.status)} · {task.id.slice(0,6)}
+          </option>)}
+        </select>
+      </label>}
+      {!job&&pendingJobs&&<p className="sg-help">{txt('有任务正在后台处理，选择任务可查看进度。','Tasks are processing in the background. Select one to see its progress.')}</p>}
+      {!job?<div className="sg-empty-results mx-empty"><div className="sg-empty-atom"><GitBranch size={53} strokeWidth={1.3}/></div><h3>{txt("暂无解析结果","No extraction results yet")}</h3><p>{txt("建立模型后，上传混合谱开始解析。","Train a model, then upload a mixture to start extraction.")}</p><div className="mx-result-legend"><span><i/>{txt('混合谱','Mixture')}</span><span><i/>{txt('目标提取谱','Extracted target')}</span><span><i/>{txt('估计背景','Estimated background')}</span></div><small>{txt('SSnet · U-Net ECA + Random Forest','SSnet · U-Net ECA + Random Forest')}</small></div>:<>
         <div className="mx-job-heading"><div><strong>{job.name}</strong><span>{job.kind==='train'?txt('标准品模型训练','Standard model training'):txt('混合谱目标提取','Mixture target extraction')} · {new Date(job.created_at).toLocaleString(getLocale())}</span></div><span className={`mx-status is-${job.status}`}>{statusText(job.status)}</span></div>
-        {activeTask(job)&&<div className="mx-progress"><div><Loader2 size={16} className="sg-spin"/><strong>{stageText(job.progress.stage)}</strong><span>{Math.floor(job.progress.percent||0)}%</span></div><progress aria-label={txt('SSnet 任务进度','SSnet progress')} max="100" value={job.progress.percent||0}/>{job.progress.epoch&&<p>Epoch {job.progress.epoch}/{job.progress.epochs} · {txt('本轮样本','Epoch samples')} {job.progress.batch_samples}/{job.progress.samples_per_epoch}</p>}<p>{txt("任务在后台运行，可离开页面。","The task continues in the background.")}</p><button disabled={busy} onClick={cancel}><Square size={13}/>{txt('停止此任务','Stop this task')}</button></div>}
-        {job.status==='failed'&&<div className="sg-alert is-error" role="alert">{systemText(job.error)}</div>}{job.status==='cancelled'&&<div className="mx-compute-note"><Info size={17}/><p>{txt("任务已停止，已保存的模型可继续使用。","Task stopped; saved models remain available.")}</p></div>}
+        {activeTask(job) && <div className="mx-progress">
+          <div><Loader2 size={16} className="sg-spin"/><strong>{stageText(job.progress.stage)}</strong><span>{Math.floor(job.progress.percent||0)}%</span></div>
+          <progress aria-label={txt('SSnet 任务进度','SSnet progress')} max="100" value={job.progress.percent||0}/>
+          {job.queue_position > 0 && <p>{txt(`等待队列第 ${job.queue_position} 位`, `Position ${job.queue_position} in the waiting queue`)}</p>}
+          {job.progress.epoch && <p>Epoch {job.progress.epoch}/{job.progress.epochs} · {txt('本轮样本','Epoch samples')} {job.progress.batch_samples}/{job.progress.samples_per_epoch}</p>}
+          <p>{txt('关闭网页后任务仍会在服务器处理。完成后可在站内查看提醒。', 'Closing the site leaves the task running on the server. A reminder will appear when it finishes.')}</p>
+          <button disabled={busy} onClick={cancel}><Square size={13}/>{txt('取消任务','Cancel task')}</button>
+        </div>}
+        {job.status==='failed'&&<div className="sg-alert is-error" role="alert">{systemText(job.error)}</div>}
+        {['cancelled', 'failed'].includes(job.status) && <>
+          <div className="mx-compute-note"><Info size={17}/><p>{txt('重新排队会沿用原光谱和参数，从头运行。', 'Requeue this task to start again with the same spectra and settings.')}</p></div>
+          <button type="button" className="sg-primary" disabled={busy || !config?.ready} onClick={retry}>
+            <RefreshCw size={14}/>{txt('重新排队', 'Requeue')}
+          </button>
+        </>}
         {job.kind==='train'&&job.status==='completed'&&<div className="mx-training-done"><Check size={30}/><h3>{txt('标准品模型已保存','Standard model saved')}</h3><p>{job.input.prepared.grid.start.toFixed(1)}–{job.input.prepared.grid.end.toFixed(1)} cm⁻¹ · {job.input.prepared.grid.points} {txt('点','points')}</p><p>{txt(`${job.input.sources.length} 条标准品 · ${job.input.settings.epochs} 轮训练`,`${job.input.sources.length} standards · ${job.input.settings.epochs} epochs`)}</p><button className="sg-primary" onClick={()=>{setModelId(job.id);setMode('predict');}}>{txt('使用此模型解析混合谱','Analyze a mixture with this model')}<ArrowRight size={14}/></button><details><summary>{txt('训练损失记录','Training loss record')}</summary><pre>{job.result.loss_history.map((loss,i)=>`Epoch ${i+1}: ${loss.toFixed(6)}`).join('\n')}</pre></details></div>}
         {output&&<MixtureResult result={output} dark={theme==='dark'} txt={txt}/>}
         <div className="mx-downloads"><FileExport txt={txt} actions={[{label:txt('任务记录 JSON','Job record JSON'),run:()=>download('json')},...(output?[{label:txt('解析光谱 CSV','Extracted spectra CSV'),run:()=>download('csv')}]:[])]} /></div>
